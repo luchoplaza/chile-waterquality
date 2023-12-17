@@ -17,7 +17,7 @@ external_stylesheets = [
 # Sample data
 #demog=pd.read_csv('./parameters/chile_demographic.csv')
 #regiones=demog['Region'].unique().tolist()
-df = pd.read_csv('src/data/rawdata_20231025.csv')
+df = pd.read_csv(r'src\data\rawdata_20231025.csv')
 df['DateTime'] = df['DateTime'].astype('datetime64[ns]')
 df = df.set_index(['DateTime'], drop=True)
 empresas=df['Empresa'].unique().tolist()
