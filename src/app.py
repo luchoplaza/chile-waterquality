@@ -17,6 +17,7 @@ external_stylesheets = [
 # Sample data
 #demog=pd.read_csv('./parameters/chile_demographic.csv')
 #regiones=demog['Region'].unique().tolist()
+#df = pd.read_csv('./src/data/rawdata_20231025.csv')
 df = pd.read_csv('data/rawdata_20231025.csv')
 df['DateTime'] = df['DateTime'].astype('datetime64[ns]')
 df = df.set_index(['DateTime'], drop=True)
@@ -75,40 +76,25 @@ app.layout = html.Div([
                             end_date=df.index.max().date(),
                         ),
                 ]),
-            # html.Div(
-            #     children=[
-            #         #html.Div(children='Fecha: ',className='menu-title'),
-            #         html.Button('Bloquear',
-            #                 id="block-data",
-            #             ),
-            #     ]),
+
         ], className='menu',),
     html.Div([
         dcc.Graph(id='line-plot',className='card'),
         html.Div([
             html.Div([
                 #html.H3('Column 1'),
-                #dcc.Graph(id='line-plot',className='card')
                 dcc.Graph(id='histogram',className='card')
             ], className="six columns"),
 
             html.Div([
                 html.H3('Estadísticas Resumen'),
-                #dcc.Textarea(id='text-example',value='Testing',
-                #    style={'width': '100%', 'height': 50},
-                #),
                 dash_table.DataTable(
                     id='table',
-                    #data={},
-                    #columns=[{'id': c, 'name': c} for c in df.columns],
-                    #columns=[{'id':'Comuna','name':'Comuna'}]
                     style_cell={'fontSize':20},
                 )
             ], className="six columns"),
         ], className="row"),
-        
-        #dcc.Graph(id='histogram',className='card')
-                
+                        
         ],className="wrapper",
         )
 ])
@@ -125,7 +111,6 @@ app.layout = html.Div([
     Input('date-range', 'end_date'),
 )
 def update_graph(city, parameter,start_date,end_date):
-    print(city, ' es la Ciudad.')
     a=[(lambda x: df['Comuna']==x)(x) for x in city]
     mask=a[0]
     for i in range(1,len(city)):
@@ -134,33 +119,23 @@ def update_graph(city, parameter,start_date,end_date):
     mask1=((filtered_data.index >=start_date)&(filtered_data.index<=end_date))
     filtered_data=filtered_data[mask1]
     try:
-        print('Intentando...')
         filtered_data['Valor']=filtered_data['Valor'].astype(float)
         filtered_data.sort_index(inplace=True)
-        print('fechas filtradas correctamente')
-        print(filtered_data)
         line_plot_fig = px.line(filtered_data, x=filtered_data.index.values, y='Valor',
                                 color='Comuna',title=f'{parameter}')
-        print('lo logro?')
-        print(filtered_data['Limite'].unique())
         line_plot_fig.add_hline(y=float(filtered_data['Limite'].unique()), line_dash="dash",
                                 line_color="red", annotation_text="Límite Superior", 
                                 annotation_position="bottom right")
-        print('cago por el plot de line')
         histogram_fig = px.histogram(filtered_data, x='Valor',color='Comuna',opacity=0.5, 
                                     histnorm='percent', title=f'{parameter} - Histograma')
         histogram_fig.add_vline(x=float(filtered_data['Limite'].unique()), line_dash="dash",
                                 line_color="red", annotation_text="Límite Superior", 
                                 annotation_position="top")
-        #df2=filtered_data['Valor'].describe().apply("{0:.1f}".format)
-        print('llego hasta aquí')
         df2=filtered_data.groupby('Comuna')['Valor'].describe().T.round(2)
         df2=df2.reset_index()
-        print(df2)
         data=df2.to_dict('records')
-        print(data)
     except:
-        print('Tuvimos problemas hermanito')
+        print('Problemas durante la actualización')
     return line_plot_fig, histogram_fig, data
 
 #app.css.append_css({
