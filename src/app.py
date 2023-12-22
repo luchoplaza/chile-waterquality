@@ -11,7 +11,8 @@ external_stylesheets = [
         ),
         "rel": "stylesheet",
         
-    },'https://codepen.io/chriddyp/pen/bWLwgP.css'
+    },'https://codepen.io/chriddyp/pen/bWLwgP.css',
+    "https://platform.linkedin.com/in.js",
 
 ]
 # Sample data
@@ -23,7 +24,10 @@ df['DateTime'] = df['DateTime'].astype('datetime64[ns]')
 df = df.set_index(['DateTime'], drop=True)
 empresas=df['Empresa'].unique().tolist()
 comuna=df['Comuna'].unique().tolist()
-parametro=df['Parametro'].unique().tolist()
+parametro=df['Parametro'].unique().tolist()[2:]
+lims={'PH':{'lim_min':6.5,'lim_max':8.5},
+      'ARSENICO':{'lim_min':0,'lim_max':0.01},
+      'CLORO LIBRE RESIDUAL':{'lim_min':0.2,'lim_max':2.0}}
 
 # Initialize the app
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -60,7 +64,7 @@ app.layout = html.Div([
                     dcc.Dropdown(
                         id='parameter-dropdown',
                         options=[{'label': str(param), 'value': param} for param in parametro],
-                        value=parametro[11],
+                        value='SOLIDOS DISUELTOS TOTALES',
                         clearable=False,
                         className='dropdown',
                         #style={'width':'120%'}
@@ -96,7 +100,8 @@ app.layout = html.Div([
         ], className="row"),
                         
         ],className="wrapper",
-        )
+        ),
+    html.Div([html.Script(**{"data-url": "https://platform.linkedin.com/in.js"}, type="IN/Share")])
 ])
 
 
@@ -121,19 +126,45 @@ def update_graph(city, parameter,start_date,end_date):
     try:
         filtered_data['Valor']=filtered_data['Valor'].astype(float)
         filtered_data.sort_index(inplace=True)
-        line_plot_fig = px.line(filtered_data, x=filtered_data.index.values, y='Valor',
-                                color='Comuna',title=f'{parameter}')
-        line_plot_fig.add_hline(y=float(filtered_data['Limite'].unique()), line_dash="dash",
-                                line_color="red", annotation_text="Límite Superior", 
-                                annotation_position="bottom right")
-        histogram_fig = px.histogram(filtered_data, x='Valor',color='Comuna',opacity=0.5, 
-                                    histnorm='percent', title=f'{parameter} - Histograma')
-        histogram_fig.add_vline(x=float(filtered_data['Limite'].unique()), line_dash="dash",
-                                line_color="red", annotation_text="Límite Superior", 
-                                annotation_position="top")
-        df2=filtered_data.groupby('Comuna')['Valor'].describe().T.round(2)
-        df2=df2.reset_index()
-        data=df2.to_dict('records')
+        #print(filtered_data)
+        if filtered_data.empty:
+            print('No hay valores para estas condiciones')
+        else:
+            line_plot_fig = px.line(filtered_data, x=filtered_data.index.values, y='Valor',
+                                    color='Comuna',title=f'{parameter}')
+            #print('2______________________')
+            histogram_fig = px.histogram(filtered_data, x='Valor',color='Comuna',opacity=0.5, 
+                                        histnorm='percent', title=f'{parameter} - Histograma')
+            #print('3______________________')
+            if parameter in lims.keys():
+                line_plot_fig.add_hline(y=lims[parameter]['lim_max'], line_dash="dash",
+                                    line_color="red", annotation_text="Límite Superior", 
+                                    annotation_position="bottom right")
+                line_plot_fig.add_hline(y=lims[parameter]['lim_min'], line_dash="dash",
+                                    line_color="red", annotation_text="Límite Inferior", 
+                                    annotation_position="bottom right")
+                histogram_fig.add_vline(x=lims[parameter]['lim_max'], line_dash="dash",
+                                    line_color="red", annotation_text="Límite Superior", 
+                                    annotation_position="top")
+                histogram_fig.add_vline(x=lims[parameter]['lim_min'], line_dash="dash",
+                                    line_color="red", annotation_text="Límite Inferior", 
+                                    annotation_position="top")
+            else:
+                #print('3______', filtered_data['Limite'].unique())
+                line_plot_fig.add_hline(y=float(filtered_data['Limite'].unique()), line_dash="dash",
+                                        line_color="red", annotation_text="Límite Superior", 
+                                        annotation_position="bottom right")
+                
+                histogram_fig.add_vline(x=float(filtered_data['Limite'].unique()), line_dash="dash",
+                                        line_color="red", annotation_text="Límite Superior", 
+                                        annotation_position="top")
+            #print('4______________________')
+            df2=filtered_data.groupby('Comuna')['Valor'].describe().T.round(2)
+            #print(df2)
+            df2=df2.reset_index()
+            #df2.loc[len(df2.index)]=['Last',]
+            data=df2.to_dict('records')
+            #print(data)
     except:
         print('Problemas durante la actualización')
     return line_plot_fig, histogram_fig, data
@@ -141,7 +172,7 @@ def update_graph(city, parameter,start_date,end_date):
 #app.css.append_css({
 #    'external_url': 'https://codepen.io/chriddyp/pen/bWLwgP.css'
 #})
-
+ 
 # Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)

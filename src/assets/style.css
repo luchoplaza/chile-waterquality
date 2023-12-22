@@ -6,7 +6,7 @@ body {
 
 .header {
     background-color: #222222;
-    height: 320px;
+    height: 380px;
     padding: 16px 0 0 0;
 }
 
@@ -18,7 +18,7 @@ body {
 
 .header-title {
     color: #FFFFFF;
-    font-size: 48px;
+    font-size: 42px;
     font-weight: bold;
     text-align: center;
     margin: 0 auto;
@@ -29,7 +29,7 @@ body {
     margin: 4px auto;
     text-align: center;
     /* max-width: 384px; */
-    max-width: 500px;
+    max-width: 380px;
 }
 
 .wrapper {
@@ -38,7 +38,7 @@ body {
     max-width: 2048px;
     padding-right: 10px;
     padding-left: 10px;
-    margin-top: 32px;
+    margin-top: 64px;
 }
 
 .card {
@@ -48,7 +48,9 @@ body {
 
 .menu {
     height: 112px;
-    width: 912px;
+    max-height: 20vw;
+    width:auto;
+    max-width: 912px;
     display: flex;
     justify-content: space-evenly;
     padding-top: 24px;
@@ -75,4 +77,37 @@ body {
     margin-bottom: 6px;
     font-weight: bold;
     color: #079A82;
+}
+
+/* Media query for screens smaller than 600px (typical smartphones) */
+@media screen and (max-width: 600px) {
+    .header {
+        height: auto;
+        padding: 16px;
+    }
+
+    .header-emoji {
+        font-size: 36px;
+    }
+
+    .header-title {
+        font-size: 32px;
+    }
+
+    .header-description {
+        max-width: 100%;
+    }
+
+    .menu {
+        height: auto;
+        max-height: none;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 16px;
+        margin: 0;
+    }
+
+    .Select-control {
+        width: 100%;
+    }
 }
