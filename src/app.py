@@ -20,9 +20,12 @@ external_stylesheets = [
 df = pd.read_csv('data/rawdata_20231025.csv')
 df['DateTime'] = df['DateTime'].astype('datetime64[ns]')
 df = df.set_index(['DateTime'], drop=True)
+#df.replace('SOLIDOS DISUELTOS TOTALES','SDT', inplace=True)
+param_disc=["OLOR","COLOR VERDADERO", "SABOR"]
 empresas=df['Empresa'].unique().tolist()
 comuna=df['Comuna'].unique().tolist()
 parametro=df['Parametro'].unique().tolist()[2:]
+parametro=[x for x in parametro if x not in param_disc]
 lims={'PH':{'lim_min':6.5,'lim_max':8.5},
       'ARSENICO':{'lim_min':0,'lim_max':0.01},
       'CLORO LIBRE RESIDUAL':{'lim_min':0.2,'lim_max':2.0}}
@@ -38,7 +41,8 @@ app.layout = html.Div([
         html.Div(children=[
             html.P(children="💧", className="header-emoji"),
             html.H1(children='Water Quality Chile',className='header-title'),
-            html.P(children=('Dashboard de la calidad fisicoquímica del agua potable en las diferentes comunas de Chile, de acuerdo a la información reportada por las empresas sanitarias. (SISS,2023). Creado por: Luis Plaza A.'),className='header-description')
+            html.P(children=('Dashboard de la calidad fisicoquímica del agua potable en las diferentes comunas de Chile, de acuerdo a la información reportada por las empresas sanitarias. (SISS,2023). Creado por: ',html.A('Luis Plaza A.',href='https://www.linkedin.com/in/lplazaalvarez/'),' Dudas y/o comentarios, contactarme !'),className='header-description'),
+            
         ])],
                 className="header"),
     html.Div([
@@ -65,14 +69,15 @@ app.layout = html.Div([
                     dcc.Dropdown(
                         id='parameter-dropdown',
                         options=[{'label': str(param), 'value': param} for param in parametro],
-                        value='SOLIDOS DISUELTOS TOTALES',
+                        optionHeight=52,
+                        value=parametro[6],
                         clearable=False,
                         className='dropdown',
                         #style={'width':'120%'}
                     ),]),
             html.Div(
                 children=[
-                    html.Div(children='Seleccione un rango de fechas: ',className='menu-title'),
+                    html.Div(children='Seleccione un rango de fechas (MM/YYYY): ',className='menu-title'),
                     dcc.DatePickerRange(
                             id="date-range",display_format='MM/YYYY',
                             min_date_allowed=df.index.min().date(),
@@ -81,31 +86,30 @@ app.layout = html.Div([
                             end_date=df.index.max().date(),
                         ),
                 ]),
-
         ], className='menu',),
     html.Div([
-        dcc.Graph(id='line-plot',className='card'),
+        dcc.Graph(id='line-plot',
+                  className='card',
+                  #style={"height": "60%", "width": "80%"}
+                  ),
         html.Div([
             html.Div([
                 #html.H3('Column 1'),
-                dcc.Graph(id='histogram',className='card')
+                dcc.Graph(id='histogram',className='card',)
             ], className="six columns"),
 
             html.Div([
-                html.H3('Estadísticas Resumen'),
+                html.H3('Estadísticas por ciudad'),
                 dash_table.DataTable(
                     id='table',
-                    style_cell={'fontSize':20},
+                    style_cell={'fontSize':18},
                 )
             ], className="six columns"),
         ], className="row"),
                         
         ],className="wrapper",
-        ),
-    
+        ),   
 ])
-
-
 # Define the callback functions
 @app.callback(
     Output('line-plot', 'figure'),
@@ -132,10 +136,23 @@ def update_graph(city, parameter,start_date,end_date):
         if filtered_data.empty:
             print('No hay valores para estas condiciones')
         else:
+            unidad=filtered_data['Unidad'].unique()[0]
             line_plot_fig = px.line(filtered_data, x=filtered_data.index.values, y='Valor',
-                                    color='Comuna',title=f'{parameter}')
+                                    color='Comuna',title=f'{parameter}', markers=True)
+            line_plot_fig.update_layout(legend=dict(y=-0.15,orientation="h"),
+                                        margin=dict(r=30),
+                                        xaxis_title="Fecha", 
+                                        yaxis_title=f"Valor ({unidad})"
+                                        )
+            line_plot_fig.update_xaxes(tickmode="auto",nticks=8)
             histogram_fig = px.histogram(filtered_data, x='Valor',color='Comuna',opacity=0.5, 
-                                        histnorm='percent', title=f'{parameter} - Histograma')
+                                        histnorm='percent', title=f'Histograma - {parameter}')
+            histogram_fig.update_layout(legend=dict(y=-0.15,orientation="h"),
+                                        margin=dict(r=30),
+                                        yaxis_title="Porcentaje (%)",
+                                        xaxis_title=f"Valor ({unidad})"
+                                        )
+            histogram_fig.update_xaxes(tickmode="auto",nticks=6)
             if parameter in lims.keys():
                 line_plot_fig.add_hline(y=lims[parameter]['lim_max'], line_dash="dash",
                                     line_color="red", annotation_text="Límite Superior", 
@@ -174,11 +191,6 @@ def update_graph(city, parameter,start_date,end_date):
     except Exception:
         print('Problemas durante la actualización')
     return line_plot_fig, histogram_fig, data
-
-#app.css.append_css({
-#    'external_url': 'https://codepen.io/chriddyp/pen/bWLwgP.css'
-#})
- 
 # Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)
