@@ -16,8 +16,8 @@ external_stylesheets = [
 # Sample data
 #demog=pd.read_csv('./parameters/chile_demographic.csv')
 #regiones=demog['Region'].unique().tolist()
-#df = pd.read_csv('./src/data/rawdata_20231025.csv')
-df = pd.read_csv('data/rawdata_20231025.csv')
+#df = pd.read_csv('./src/data/rawdata_20240409.csv')
+df = pd.read_csv('data/rawdata_20240409.csv')
 df['DateTime'] = df['DateTime'].astype('datetime64[ns]')
 df = df.set_index(['DateTime'], drop=True)
 #df.replace('SOLIDOS DISUELTOS TOTALES','SDT', inplace=True)
@@ -99,7 +99,7 @@ app.layout = html.Div([
             ], className="six columns"),
 
             html.Div([
-                html.H3('Estadísticas por ciudad'),
+                html.H3('Estadísticas'),
                 dash_table.DataTable(
                     id='table',
                     style_cell={'fontSize':18},

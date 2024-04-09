@@ -23,7 +23,8 @@ creds.js
  
 # Private Files
 *.json
-*.csv
+chile_demographic.csv
+#*.csv
 *.csv.gz
 *.tsv
 *.tsv.gz
