@@ -42,6 +42,7 @@ st.markdown(
     de acuerdo a la información reportada por las empresas sanitarias (SISS, 2023).  
     Creado por: [Luis Plaza A.](https://www.linkedin.com/in/lplazaalvarez/)  
     ¡Dudas y/o comentarios, contáctame!
+    Para seleccionar comuna/parametro/fechas desplegar menù lateral en la esquina superior izquierda
     """,
     unsafe_allow_html=True,
 )
@@ -66,29 +67,22 @@ selected_parameter = st.sidebar.selectbox(
 min_date = df.index.min().date()
 max_date = df.index.max().date()
 
-# Inyectar CSS para ocultar el calendario emergente
-st.markdown("""
-<style>
-/* Oculta el popover (calendario) de los widgets DatePicker */
-[data-baseweb="popover"] {
-    display: none !important;
-}
-</style>
-""", unsafe_allow_html=True)
+# Quitar el DatePickerRange y reemplazarlo por dos text_input
+st.sidebar.write("Ingrese rango de fechas en formato YYYY-MM-DD:")
+start_str = st.sidebar.text_input("Fecha inicio:", value=min_date)  
+end_str = st.sidebar.text_input("Fecha fin:", value=max_date)  
 
-date_range = st.sidebar.date_input(
-    "Seleccione un rango de fechas (YYYY/MM/DD):",
-    value=(min_date, max_date),
-    min_value=min_date,
-    max_value=max_date
-)
-if isinstance(date_range, tuple) and len(date_range) == 2:
-    start_date, end_date = date_range
-else:
-    start_date = end_date = date_range
-
-if start_date > end_date:
-    st.sidebar.error("La fecha inicio debe ser anterior a la fecha fin.")
+# Convertir las cadenas a tipo fecha
+try:
+    start_date = pd.to_datetime(start_str).date()
+    end_date = pd.to_datetime(end_str).date()
+    if start_date > end_date:
+        st.sidebar.error("La fecha de inicio no puede ser mayor que la fecha fin.")
+except ValueError:
+    st.sidebar.error("Formato de fecha inválido. Usa YYYY-MM-DD.")
+    # Si falla, fijamos algunos valores por defecto:
+    start_date = df.index.min().date()
+    end_date = df.index.max().date()
 
 # Filtrado de datos
 if not selected_cities:
