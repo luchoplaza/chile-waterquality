@@ -66,6 +66,16 @@ selected_parameter = st.sidebar.selectbox(
 min_date = df.index.min().date()
 max_date = df.index.max().date()
 
+# Inyectar CSS para ocultar el calendario emergente
+st.markdown("""
+<style>
+/* Oculta el popover (calendario) de los widgets DatePicker */
+[data-baseweb="popover"] {
+    display: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 date_range = st.sidebar.date_input(
     "Seleccione un rango de fechas (MM/DD/YYYY):",
     value=(min_date, max_date),
