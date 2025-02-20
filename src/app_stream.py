@@ -158,7 +158,6 @@ else:
         opacity=0.5,
         histnorm='percent',
         title=f'Histograma - {selected_parameter}',
-        alpha=0.7
     )
     hist_fig.update_layout(
         legend=dict(y=-0.15, orientation="h"),
