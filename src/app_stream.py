@@ -77,7 +77,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 date_range = st.sidebar.date_input(
-    "Seleccione un rango de fechas (MM/DD/YYYY):",
+    "Seleccione un rango de fechas (YYYY/MM/DD):",
     value=(min_date, max_date),
     min_value=min_date,
     max_value=max_date
