@@ -6,8 +6,6 @@ import os
 # Configuración de la página
 st.set_page_config(page_title="Water Quality Chile - SISS Data", layout="wide")
 
-# Nota: Coloca tu archivo style.css en la carpeta "assets" para que Streamlit lo cargue automáticamente.
-
 @st.cache_data
 def load_data():
     # Carga los datos
@@ -21,7 +19,7 @@ def load_data():
 df = load_data()
 
 # Lista de parámetros y comunas
-param_disc = ["OLOR", "COLOR VERDADERO", "SABOR"]
+param_disc = ["OLOR", "COLOR VERDADERO", "SABOR"] # Se ignoran estos parametros
 empresas = df['Empresa'].unique().tolist()
 comunas = df['Comuna'].unique().tolist()
 parametros = df['Parametro'].unique().tolist()[2:]
@@ -35,14 +33,14 @@ lims = {
 }
 
 # Título principal
-st.markdown("<h1 style='text-align: center;'>💧 Water Quality Chile</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>💧 Calidad de agua potable Chile</h1>", unsafe_allow_html=True)
 st.markdown(
     """
     Dashboard de la calidad fisicoquímica del agua potable en las diferentes comunas de Chile, 
     de acuerdo a la información reportada por las empresas sanitarias (SISS, 2023).  
     Creado por: [Luis Plaza A.](https://www.linkedin.com/in/lplazaalvarez/)  
-    ¡Dudas y/o comentarios, contáctame!
-    Para seleccionar comuna/parametro/fechas desplegar menù lateral en la esquina superior izquierda
+    ¡Dudas y/o comentarios, contáctame!.
+    Desde celulares, para seleccionar comuna/parametro/fechas desplegar menù lateral en la esquina superior izquierda.
     """,
     unsafe_allow_html=True,
 )
@@ -66,8 +64,6 @@ selected_parameter = st.sidebar.selectbox(
 # Rango de fechas
 min_date = df.index.min().date()
 max_date = df.index.max().date()
-
-# Quitar el DatePickerRange y reemplazarlo por dos text_input
 st.sidebar.write("Ingrese rango de fechas en formato YYYY-MM-DD:")
 start_str = st.sidebar.text_input("Fecha inicio:", value=min_date)  
 end_str = st.sidebar.text_input("Fecha fin:", value=max_date)  
@@ -94,6 +90,15 @@ filtered_data = df[mask].copy()
 
 mask_date = (filtered_data.index.date >= start_date) & (filtered_data.index.date <= end_date)
 filtered_data = filtered_data[mask_date]
+
+# Disclaimer de comunas
+st.sidebar.markdown(
+    """
+    Algunas comunas pueden estar embebidas en servicios mas grandes como "Gran Santiago" contiene a Santiago Centro, Ñuñoa, Providencia, etc.
+    Otras comunas pueden no aparecer debido no se tiene actualmente el detalle de que comunas componen cada servicio/concesión de agua potable.
+    """,
+    unsafe_allow_html=True,
+)
 
 if filtered_data.empty:
     st.warning("No hay valores para estas condiciones.")
@@ -201,9 +206,7 @@ else:
                 pass
 
     # ===== Estadísticas numéricas =====
-    # Agrupamos por comuna y calculamos describe()
-    # Esto devuelve estadísticos en filas, por lo que usamos .T para transponer
-    # y renombramos ejes para facilitar la lectura.
+    # Se agrupa por comuna y calculamos el .describe() para presentar estadistica basica
     stats_numeric = filtered_data.groupby('Comuna')['Valor'].describe().T.round(2)
     stats_numeric = stats_numeric.rename_axis("Variable").reset_index()
 
