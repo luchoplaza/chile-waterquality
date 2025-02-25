@@ -94,8 +94,14 @@ filtered_data = filtered_data[mask_date]
 # Disclaimer de comunas
 st.sidebar.markdown(
     """
-    Algunas comunas pueden estar embebidas en servicios mas grandes como "Gran Santiago" contiene a Santiago Centro, Ñuñoa, Providencia, etc.
-    Otras comunas pueden no aparecer debido no se tiene actualmente el detalle de que comunas componen cada servicio/concesión de agua potable.
+    💧 Notas:
+    """,
+    unsafe_allow_html=True,
+)
+st.sidebar.markdown(
+    """
+    Algunas comunas pueden estar embebidas en servicios mas grandes como "Gran Santiago" contiene a Santiago Centro, Ñuñoa, Providencia, etc.\n
+    Actualmente no se tiene actualmente el detalle de que comunas componen cada servicio/concesión de agua potable.
     """,
     unsafe_allow_html=True,
 )
