@@ -52,15 +52,19 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Panel lateral (sidebar) con filtros generales
+# -------------------------------------------------------------------
+# SIDEBAR
+# -------------------------------------------------------------------
 st.sidebar.header("Filtros")
 
+# Ciudades para análisis temporal
 selected_cities = st.sidebar.multiselect(
     "Seleccione una ciudad:",
     options=comunas,
     default=[comunas[0]] if comunas else [],
 )
 
+# Parámetro
 default_index = 6 if len(parametros) > 6 else 0
 selected_parameter = st.sidebar.selectbox(
     "Seleccione parámetro:",
@@ -68,7 +72,7 @@ selected_parameter = st.sidebar.selectbox(
     index=default_index,
 )
 
-# Rango de fechas
+# Rango de fechas (texto)
 min_date = df.index.min().date()
 max_date = df.index.max().date()
 st.sidebar.write("Ingrese rango de fechas en formato YYYY-MM-DD:")
@@ -83,20 +87,11 @@ try:
         st.sidebar.error("La fecha de inicio no puede ser mayor que la fecha fin.")
 except ValueError:
     st.sidebar.error("Formato de fecha inválido. Usa YYYY-MM-DD.")
-    # Si falla, fijamos algunos valores por defecto:
     start_date = df.index.min().date()
     end_date = df.index.max().date()
 
-# Controles adicionales para clasificación por máximos
+# Controles para clasificación por máximos
 st.sidebar.header("Clasificación por máximos")
-
-top_n = st.sidebar.slider(
-    "Top N comunas:",
-    min_value=5,
-    max_value=30,
-    step=5,
-    value=10,
-)
 
 opciones_comuna_ficha = ["(Usar comuna con máximo más alto)"] + comunas
 selected_city_max_label = st.sidebar.selectbox(
@@ -105,10 +100,12 @@ selected_city_max_label = st.sidebar.selectbox(
     index=0,
 )
 selected_city_max = (
-    None if selected_city_max_label == "(Usar comuna con máximo más alto)" else selected_city_max_label
+    None
+    if selected_city_max_label == "(Usar comuna con máximo más alto)"
+    else selected_city_max_label
 )
 
-# Disclaimer de comunas
+# Disclaimer
 st.sidebar.markdown("\n💧 Notas:\n", unsafe_allow_html=True)
 st.sidebar.markdown(
     """
@@ -119,64 +116,80 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
-# =============================================================================
-# 1) Análisis temporal - filtrado por ciudades seleccionadas
-# =============================================================================
+# -------------------------------------------------------------------
+# FILTRADO GENERAL POR RANGO DE FECHAS
+# -------------------------------------------------------------------
+mask_time = (df.index.date >= start_date) & (df.index.date <= end_date)
 
+# -------------------------------------------------------------------
+# 1) ANÁLISIS TEMPORAL (usa ciudades seleccionadas)
+# -------------------------------------------------------------------
 if not selected_cities:
     st.warning("No se ha seleccionado ninguna ciudad. Se usará la primera disponible.")
     selected_cities = [comunas[0]] if comunas else []
 
-mask_time = (df.index.date >= start_date) & (df.index.date <= end_date)
-
 mask_temporal = df["Comuna"].isin(selected_cities) & (df["Parametro"] == selected_parameter)
 filtered_data = df[mask_temporal & mask_time].copy()
 
-# Intentar convertir a float
 if not filtered_data.empty:
     try:
         filtered_data["Valor"] = filtered_data["Valor"].astype(float)
     except Exception as e:
         st.error(f"Error al convertir los valores a float: {e}")
 
-# =============================================================================
-# 2) Clasificación por máximos - ranking global por parámetro en el rango
-# =============================================================================
-
-# Filtrar solo por parámetro y rango de fechas (todas las comunas)
+# -------------------------------------------------------------------
+# 2) CLASIFICACIÓN POR MÁXIMOS - RANKING GLOBAL POR PARÁMETRO
+# -------------------------------------------------------------------
 df_param = df[(df["Parametro"] == selected_parameter) & mask_time].copy()
 
 ranking_fig = None
 maxima_table = None
 
 if not df_param.empty:
+    # Aseguramos Valor numérico
     df_param["Valor"] = pd.to_numeric(df_param["Valor"], errors="coerce")
-    df_param = df_param.dropna(subset=["Valor"])  # quitamos NaN en Valor
+    df_param = df_param.dropna(subset=["Valor"])
 
     if not df_param.empty:
-        # Índice de la fila con máximo por comuna
-        try:
-            idxmax_series = df_param.groupby("Comuna")["Valor"].idxmax()
-            grouped = df_param.loc[idxmax_series, ["Comuna", "Valor", "Limite"]].copy()
-            grouped.rename(columns={"Valor": "Valor máximo"}, inplace=True)
-            grouped["Fecha máximo"] = grouped.index.strftime("%Y-%m-%d")
+        # Agregamos por comuna:
+        # - Valor_max = máximo del parámetro
+        # - Fecha_max = fecha (índice) en que ocurre ese máximo
+        # - Limite = máximo del límite numérico (por seguridad)
+        grouped = (
+            df_param.groupby("Comuna")
+            .agg(
+                Valor_max=("Valor", "max"),
+                Fecha_max=("Valor", lambda s: s.idxmax()),
+                Limite=("Limite", lambda x: pd.to_numeric(x, errors="coerce").max()),
+            )
+            .reset_index()
+        )
 
-            # Asegurar columna límite numérica
-            grouped["Limite"] = pd.to_numeric(grouped["Limite"], errors="coerce")
+        if not grouped.empty:
+            grouped["Fecha máximo"] = grouped["Fecha_max"].dt.strftime("%Y-%m-%d")
+            grouped.drop(columns=["Fecha_max"], inplace=True)
 
-            # Ordenar y tomar top N
-            grouped = grouped.sort_values("Valor máximo", ascending=False)
-            top_n_int = int(top_n) if top_n is not None else 10
-            top_grouped = grouped.head(top_n_int)
+            # Ordenamos por Valor máximo (descendente)
+            grouped = grouped.sort_values("Valor_max", ascending=False)
 
-            # Figura de ranking
+            # Guardamos tabla completa de máximos por comuna
+            maxima_table = grouped.copy()
+            maxima_table.rename(
+                columns={"Valor_max": "Valor máximo", "Limite": "Límite"},
+                inplace=True,
+            )
+
+            # TOMAMOS SIEMPRE TOP 5 COMUNAS
+            top_grouped = grouped.head(5)
+
+            # Gráfico de ranking (Top 5)
             ranking_fig = px.bar(
                 top_grouped,
-                x="Valor máximo",
+                x="Valor_max",
                 y="Comuna",
                 orientation="h",
-                text="Valor máximo",
-                title=f"Ranking de comunas por máximo de {selected_parameter}",
+                text="Valor_max",
+                title=f"Top 5 comunas por máximo de {selected_parameter}",
             )
             ranking_fig.update_layout(
                 yaxis={"categoryorder": "total ascending"},
@@ -198,20 +211,15 @@ if not df_param.empty:
                     annotation_position="top",
                 )
 
-            maxima_table = grouped.reset_index(drop=True)
-        except Exception as e:  # protección defensiva
-            st.error(f"No se pudo calcular el ranking de máximos: {e}")
-
-# =============================================================================
-# 3) Ficha de comuna - perfil de máximos por parámetro (Radar)
-# =============================================================================
-
+# -------------------------------------------------------------------
+# 3) FICHA DE COMUNA - PERFIL DE MÁXIMOS POR PARÁMETRO (RADAR)
+# -------------------------------------------------------------------
 radar_fig = None
 city_max_table = None
 city_for_profile = selected_city_max
 
 if maxima_table is not None and not maxima_table.empty:
-    # Si no se selecciona comuna explícita, usar la de máximo más alto
+    # Si no se eligió comuna explícita, usamos la comuna con mayor Valor máximo
     if city_for_profile is None:
         city_for_profile = maxima_table.iloc[0]["Comuna"]
 
@@ -222,7 +230,6 @@ if maxima_table is not None and not maxima_table.empty:
         df_city = df_city.dropna(subset=["Valor"])
 
         if not df_city.empty:
-            # Agrupar por parámetro: máximo y límite
             city_grouped = (
                 df_city.groupby("Parametro")
                 .agg(
@@ -248,7 +255,7 @@ if maxima_table is not None and not maxima_table.empty:
 
                 city_grouped["Ratio_norma"] = city_grouped.apply(_ratio, axis=1)
 
-                # Ordenar por nombre de parámetro para un radar estable
+                # Ordenar por nombre de parámetro
                 city_grouped_sorted = city_grouped.sort_values("Parametro")
                 categorias = city_grouped_sorted["Parametro"].tolist()
 
@@ -258,7 +265,7 @@ if maxima_table is not None and not maxima_table.empty:
                     if pd.notnull(r):
                         ratios.append(r)
                     else:
-                        # Normalización alternativa: respecto al máximo global
+                        # Normalizar respecto al máximo global de ese parámetro
                         df_param_all = df[
                             (df["Parametro"] == row["Parametro"]) & mask_time
                         ].copy()
@@ -275,7 +282,6 @@ if maxima_table is not None and not maxima_table.empty:
                             ratios.append(0.0)
 
                 if ratios:
-                    # Cerrar el polígono del radar
                     categorias_cerradas = categorias + [categorias[0]]
                     ratios_cerrados = ratios + [ratios[0]]
 
@@ -314,12 +320,12 @@ if maxima_table is not None and not maxima_table.empty:
                         "Ratio vs norma"
                     ].apply(lambda x: round(x, 2) if pd.notnull(x) else None)
 
-# =============================================================================
-# Layout principal con pestañas
-# =============================================================================
-
+# -------------------------------------------------------------------
+# LAYOUT PRINCIPAL CON PESTAÑAS
+# -------------------------------------------------------------------
 tab1, tab2 = st.tabs(["Análisis temporal", "Clasificación por máximos"])
 
+# ================== TAB 1: ANÁLISIS TEMPORAL =====================
 with tab1:
     if filtered_data.empty:
         st.warning("No hay valores para estas condiciones.")
@@ -331,7 +337,7 @@ with tab1:
             else ""
         )
 
-        # ===== Gráfico de línea =====
+        # ----- Gráfico de línea -----
         line_fig = px.line(
             filtered_data,
             x=filtered_data.index,
@@ -348,7 +354,7 @@ with tab1:
         )
         line_fig.update_xaxes(tickmode="auto", nticks=8)
 
-        # Líneas de referencia si el parámetro está en lims
+        # Líneas de referencia
         if selected_parameter in lims.keys():
             line_fig.add_hline(
                 y=lims[selected_parameter]["lim_max"],
@@ -378,7 +384,7 @@ with tab1:
                 except Exception:
                     pass
 
-        # ===== Histograma =====
+        # ----- Histograma -----
         hist_fig = px.histogram(
             filtered_data,
             x="Valor",
@@ -424,7 +430,7 @@ with tab1:
                 except Exception:
                     pass
 
-        # ===== Estadísticas numéricas =====
+        # ----- Estadísticas numéricas -----
         stats_numeric = (
             filtered_data.groupby("Comuna")["Valor"].describe().T.round(2)
         )
@@ -442,7 +448,7 @@ with tab1:
         }
         stats_numeric["Variable"] = stats_numeric["Variable"].map(rename_map)
 
-        # ===== Último valor y fecha por comuna =====
+        # Último valor y fecha por comuna
         last_values_list = []
         for city in selected_cities:
             city_data = filtered_data[filtered_data["Comuna"] == city]
@@ -456,26 +462,23 @@ with tab1:
                         "Última Fecha": last_date,
                     }
                 )
-
         last_values_df = pd.DataFrame(last_values_list)
 
-        # ===== Visualización final pestaña 1 =====
+        # Visualización final tab 1
         st.plotly_chart(line_fig, use_container_width=True)
-
         col1, col2 = st.columns(2)
         with col1:
             st.plotly_chart(hist_fig, use_container_width=True)
-
         with col2:
             st.subheader("Estadísticas Numéricas")
             st.dataframe(stats_numeric)
-
             if not last_values_df.empty:
                 st.subheader("Última Medición")
                 st.dataframe(last_values_df)
 
+# ================== TAB 2: CLASIFICACIÓN POR MÁXIMOS =====================
 with tab2:
-    st.subheader(f"Ranking por máximos - parámetro: {selected_parameter}")
+    st.subheader(f"Top 5 comunas por máximos de {selected_parameter}")
 
     if ranking_fig is None:
         st.info(
@@ -483,9 +486,7 @@ with tab2:
         )
     else:
         st.plotly_chart(ranking_fig, use_container_width=True)
-
-        # Mostrar tabla de máximos globales por comuna (opcional)
-        with st.expander("Ver tabla de máximos por comuna"):
+        with st.expander("Ver tabla de máximos por comuna (todas)"):
             st.dataframe(maxima_table)
 
     st.markdown("---")
@@ -497,10 +498,8 @@ with tab2:
         )
     else:
         col1, col2 = st.columns(2)
-
         with col1:
             st.plotly_chart(radar_fig, use_container_width=True)
-
         with col2:
             st.subheader(f"Máximos por parámetro - {city_for_profile}")
             st.dataframe(city_max_table)
