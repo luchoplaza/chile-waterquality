@@ -79,7 +79,6 @@ LIMS = {
     "NITRATOS": {"lim_max": 50, "ref": 50},
     "CINC": {"lim_max": 3.0, "ref": 3.0},
     "COBRE": {"lim_max": 2.0, "ref": 2.0},
-    # Agregado para que funcione en el radar (valor referencial aprox NCh409)
     "SOLIDOS DISUELTOS TOTALES": {"lim_max": 1500, "ref": 1500} 
 }
 
@@ -90,7 +89,7 @@ all_comunas = sorted(df_raw["Comuna"].unique())
 # ==========================================
 # BARRA LATERAL (Navegación y Filtros)
 # ==========================================
-st.sidebar.title("Water Quality Chile") # Titulo más cercano al original
+st.sidebar.title("Water Quality Chile")
 modo_visualizacion = st.sidebar.radio(
     "Seleccione análisis:",
     options=["Análisis Temporal", "Radar de Riesgos (Comparativo)"],
@@ -106,7 +105,7 @@ if modo_visualizacion == "Análisis Temporal":
     
     st.sidebar.subheader("🛠️ Filtros")
     
-    # 1. Definir índice por defecto para Parámetro (SOLIDOS DISUELTOS TOTALES)
+    # Defaults
     default_param_name = "SOLIDOS DISUELTOS TOTALES"
     try:
         default_param_index = all_params.index(default_param_name)
@@ -115,9 +114,7 @@ if modo_visualizacion == "Análisis Temporal":
 
     selected_param = st.sidebar.selectbox("Parámetro", all_params, index=default_param_index)
     
-    # 2. Definir valores por defecto para Comuna (COPIAPO)
     default_comunas = ["COPIAPO"]
-    # Filtrar solo si existen en la data
     default_comunas = [c for c in default_comunas if c in all_comunas]
     if not default_comunas and all_comunas:
         default_comunas = [all_comunas[0]]
@@ -133,7 +130,9 @@ if modo_visualizacion == "Análisis Temporal":
         max_value=max_date
     )
 
-    st.title(f"📈 Evolución: {selected_param}")
+    # TITULO CAMBIADO
+    st.title("Dashboard Calidad de agua potable Chile")
+    st.markdown(f"**Parámetro analizado:** {selected_param}")
     
     if not selected_comunas:
         st.warning("Seleccione al menos una comuna en la barra lateral.")
@@ -157,7 +156,6 @@ if modo_visualizacion == "Análisis Temporal":
                 labels={"Valor": f"Valor ({df_filtered['Unidad'].iloc[0]})"}
             )
             
-            # Líneas de límite normativo
             if selected_param in LIMS:
                 limits = LIMS[selected_param]
                 if "lim_max" in limits and limits["lim_max"] > 0:
@@ -184,34 +182,49 @@ if modo_visualizacion == "Análisis Temporal":
                     delta = None
                     if len(df_c) > 1:
                         prev_val = df_c.iloc[-2]["Valor"]
-                        delta = round(last_val - prev_val, 4)
+                        delta = round(last_val - prev_val, 1) # Redondeado a 1 decimal
                     
                     with cols_kpi[col_idx]:
+                        # Valor formateado a 1 decimal (.1f)
                         st.metric(
                             label=f"{comuna}",
-                            value=f"{last_val} {df_c.iloc[0]['Unidad']}",
+                            value=f"{last_val:.1f} {df_c.iloc[0]['Unidad']}",
                             delta=delta,
                             help=f"Fecha medición: {last_date_str}"
                         )
 
-            # 3. Histograma y Estadísticas (Restaurando el histograma original)
+            # 3. Histograma y Estadísticas
             col1, col2 = st.columns([1, 1])
             with col1:
-                st.subheader("Distribución de Valores")
+                # TITULO SECCION CAMBIADO
+                st.subheader("Histograma")
                 fig_hist = px.histogram(
                     df_filtered, 
                     x="Valor", 
                     color="Comuna", 
                     barmode="overlay",
-                    title="Histograma de frecuencias",
+                    title="Histograma", # TITULO GRAFICO CAMBIADO
                     opacity=0.7
                 )
                 st.plotly_chart(fig_hist, use_container_width=True)
                 
             with col2:
                 st.subheader("Resumen Estadístico")
+                
+                # Calcular estadísticos básicos
                 stats = df_filtered.groupby("Comuna")["Valor"].describe()[['count', 'mean', 'max', 'min', 'std']]
-                st.dataframe(stats.style.format("{:.3f}"), use_container_width=True)
+                
+                # Calcular última fecha por comuna (Mes-Año)
+                last_dates = df_filtered.groupby("Comuna")["DateTime"].max().dt.strftime('%m-%Y')
+                
+                # Unir fecha al dataframe de estadísticas
+                stats["Último Dato"] = last_dates
+                
+                # Mostrar dataframe formateado a 1 decimal
+                st.dataframe(
+                    stats.style.format("{:.1f}", subset=['mean', 'max', 'min', 'std']), 
+                    use_container_width=True
+                )
                 
             # Sección de Descarga
             st.subheader("Exportar Datos")
@@ -236,7 +249,6 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
         "normalizado respecto a la norma. Valor > 1.0 indica fuera de norma."
     )
     
-    # 1. Defaults para Comunas (COPIAPO y VALPARAISO)
     default_radar_comunas = ["COPIAPO", "VALPARAISO"]
     default_radar_comunas = [c for c in default_radar_comunas if c in all_comunas]
     
@@ -245,20 +257,16 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
         default=default_radar_comunas if default_radar_comunas else all_comunas[:2]
     )
     
-    # 2. Defaults para Parámetros
-    # Incluir Solidos Disueltos, Excluir Coliformes y Turbiedad
     params_avail = [p for p in all_params if p in LIMS]
     
     default_radar_params = []
     excluded_params = ["COLIFORMES TOTALES", "TURBIEDAD"]
     
     for p in params_avail:
-        # Si está en la lista de excluidos, no lo agrego por defecto
         if p in excluded_params:
             continue
         default_radar_params.append(p)
     
-    # Asegurar que SOLIDOS DISUELTOS esté si existe en avail
     if "SOLIDOS DISUELTOS TOTALES" in params_avail and "SOLIDOS DISUELTOS TOTALES" not in default_radar_params:
         default_radar_params.append("SOLIDOS DISUELTOS TOTALES")
 
@@ -266,15 +274,14 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
         "Parámetros", params_avail, default=default_radar_params
     )
 
-    st.title("🕸️ Radar de Riesgos Multidimensional")
+    # TITULO CAMBIADO A "Radar multipárametro"
+    st.title("🕸️ Radar multipárametro")
     
     if not radar_comunas or not radar_params:
         st.warning("Seleccione al menos una comuna y parámetros.")
     else:
         fig_radar = go.Figure()
         data_exists = False
-        
-        # Guardar datos para tabla resumen
         summary_data = []
 
         for comuna in radar_comunas:
@@ -284,14 +291,12 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
             df_comuna = df_raw[df_raw["Comuna"] == comuna]
             if df_comuna.empty: continue
                 
-            # Buscar último año de datos de ESA comuna
             last_date = df_comuna["DateTime"].max()
             start_date = last_date - timedelta(days=365)
             df_last_year = df_comuna[df_comuna["DateTime"] >= start_date]
             
             if df_last_year.empty: continue
             
-            # Calcular scores
             comuna_has_data = False
             for param in radar_params:
                 df_p = df_last_year[df_last_year["Parametro"] == param]
@@ -304,13 +309,12 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
                     theta_values.append(param)
                     comuna_has_data = True
                     
-                    # Agregar a resumen
                     summary_data.append({
                         "Comuna": comuna,
                         "Parámetro": param,
                         "Max Valor (Año)": max_val,
                         "Límite Ref": ref_val,
-                        "Indice Riesgo": round(norm_score, 2),
+                        "Indice Riesgo": round(norm_score, 1), # Redondeado a 1 decimal
                         "Última Fecha": last_date.date()
                     })
                 else:
@@ -326,7 +330,6 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
                 data_exists = True
 
         if data_exists:
-            # Línea de límite = 1.0
             line_ref = [1.0] * (len(radar_params) + 1)
             line_theta = radar_params + [radar_params[0]]
             fig_radar.add_trace(go.Scatterpolar(
@@ -335,7 +338,6 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
                 name='Límite (100%)', hoverinfo='skip'
             ))
 
-            # Calcular rango dinámico de manera segura
             max_val_found = 0
             for trace in fig_radar.data:
                 if hasattr(trace, 'r') and trace.r:
@@ -352,21 +354,19 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
             
             st.plotly_chart(fig_radar, use_container_width=True)
             
-            # Tabla de detalles debajo del radar
             st.subheader("Detalle de valores críticos")
             df_summary = pd.DataFrame(summary_data)
             if not df_summary.empty:
-                # Ordenar por riesgo descendente
                 df_summary = df_summary.sort_values("Indice Riesgo", ascending=False)
                 
-                # Función para colorear filas peligrosas
                 def highlight_risk(val):
                     color = 'red' if val > 1.0 else 'orange' if val > 0.8 else 'green'
                     return f'color: {color}; font-weight: bold'
 
                 st.dataframe(
                     df_summary.style.applymap(highlight_risk, subset=['Indice Riesgo'])
-                    .format({"Max Valor (Año)": "{:.4f}", "Indice Riesgo": "{:.2f}"}),
+                    # Formato a 1 decimal en todas las columnas numéricas visibles
+                    .format({"Max Valor (Año)": "{:.1f}", "Indice Riesgo": "{:.1f}"}),
                     use_container_width=True, hide_index=True
                 )
         else:
@@ -386,4 +386,4 @@ with st.sidebar.expander("ℹ️ Acerca de"):
     - **Datos:** Extraídos de reportes SISS.
     - **Desarrollador:** Lucho Plaza.
     """)
-    st.caption("v1.3 - Streamlit Edition")
+    st.caption("v1.5 - Streamlit Edition")
