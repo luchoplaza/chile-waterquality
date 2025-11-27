@@ -1,505 +1,334 @@
 import os
-
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from datetime import timedelta
 
-# Configuración de la página
-st.set_page_config(page_title="Water Quality Chile - SISS Data", layout="wide")
+# ==========================================
+# CONFIGURACIÓN DE LA PÁGINA
+# ==========================================
+st.set_page_config(
+    page_title="Monitor de Calidad del Agua - Chile",
+    layout="wide",
+    page_icon="💧",
+    initial_sidebar_state="expanded"
+)
 
+# Estilos CSS personalizados para métricas
+st.markdown("""
+<style>
+    [data-testid="stMetricValue"] {
+        font-size: 24px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
+# ==========================================
+# CARGA DE DATOS
+# ==========================================
 @st.cache_data
 def load_data():
-    """Carga los datos originales desde la carpeta data."""
+    """Carga los datos originales, formatea fechas y limpia numéricos."""
     script_dir = os.path.abspath(os.path.dirname(__file__))
-    data_path = os.path.join(script_dir, "data", "rawdata_20240409.csv")
-    df = pd.read_csv(data_path)
+    # Intenta cargar desde carpeta data (estructura repo) o raíz
+    data_path_folder = os.path.join(script_dir, "data", "rawdata_20240409.csv")
+    data_path_root = "rawdata_20240409 (1).csv" 
+    
+    if os.path.exists(data_path_folder):
+        df = pd.read_csv(data_path_folder)
+    elif os.path.exists(data_path_root):
+        df = pd.read_csv(data_path_root)
+    else:
+        # Intento final nombre genérico
+        try:
+            df = pd.read_csv("rawdata_20240409.csv")
+        except:
+            st.error("⚠️ Error Crítico: No se encontró el archivo de datos 'rawdata_20240409.csv'.")
+            return pd.DataFrame()
+
+    # Conversión de fechas y numéricos
     df["DateTime"] = pd.to_datetime(df["DateTime"])
-    df = df.set_index("DateTime", drop=True)
-    return df
+    
+    if df["Valor"].dtype == object:
+        df["Valor"] = df["Valor"].astype(str).str.replace(",", ".").replace("Ausencia", "0")
+        df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce")
+    
+    return df.sort_values("DateTime")
 
+df_raw = load_data()
 
-df = load_data()
+if df_raw.empty:
+    st.stop()
 
-# Lista de parámetros y comunas
-param_disc = ["OLOR", "COLOR VERDADERO", "SABOR"]  # Se ignoran estos parámetros discretos
-empresas = df["Empresa"].unique().tolist()
-comunas = df["Comuna"].unique().tolist()
-parametros = df["Parametro"].unique().tolist()[2:]
-parametros = [x for x in parametros if x not in param_disc]
-
-# Límites de referencia
-lims = {
-    "PH": {"lim_min": 6.5, "lim_max": 8.5},
-    "ARSENICO": {"lim_min": 0, "lim_max": 0.01},
-    "CLORO LIBRE RESIDUAL": {"lim_min": 0.2, "lim_max": 2.0},
+# ==========================================
+# REFERENCIAS Y CONSTANTES
+# ==========================================
+LIMS = {
+    "PH": {"lim_min": 6.5, "lim_max": 8.5, "ref": 8.5},
+    "ARSENICO": {"lim_max": 0.01, "ref": 0.01},
+    "CLORO LIBRE RESIDUAL": {"lim_min": 0.2, "lim_max": 2.0, "ref": 2.0},
+    "COLIFORMES TOTALES": {"lim_max": 0, "ref": 1},
+    "TURBIEDAD": {"lim_max": 2.0, "ref": 2.0},
+    "FLUORURO": {"lim_max": 1.5, "ref": 1.5},
+    "RAZON NITRATOS + NITRITOS": {"lim_max": 1.0, "ref": 1.0},
+    "TRIHALOMETANOS": {"lim_max": 1.0, "ref": 1.0},
+    "SULFATOS": {"lim_max": 250, "ref": 250},
+    "HIERRO": {"lim_max": 0.3, "ref": 0.3},
+    "MANGANESO": {"lim_max": 0.1, "ref": 0.1},
+    "NITRATOS": {"lim_max": 50, "ref": 50},
+    "CINC": {"lim_max": 3.0, "ref": 3.0},
+    "COBRE": {"lim_max": 2.0, "ref": 2.0},
 }
 
-# Título principal
-st.markdown(
-    "<h1 style='text-align: center;'>💧 Calidad de agua potable Chile</h1>",
-    unsafe_allow_html=True,
-)
-st.markdown(
-    """
-    Dashboard de la calidad fisicoquímica del agua potable en las diferentes comunas de Chile, 
-    de acuerdo a la información reportada por las empresas sanitarias (SISS, 2023).  
-    Creado por: [Luis Plaza A.](https://www.linkedin.com/in/lplazaalvarez/)  
-    ¡Dudas y/o comentarios, contáctame!.  
-    Desde celulares, para seleccionar comuna/parametro/fechas desplegar menú lateral en la esquina superior izquierda.
-    """,
-    unsafe_allow_html=True,
+param_disc = ["OLOR", "COLOR VERDADERO", "SABOR"]
+all_params = [p for p in df_raw["Parametro"].unique() if p not in param_disc]
+all_comunas = sorted(df_raw["Comuna"].unique())
+
+# ==========================================
+# BARRA LATERAL (Navegación y Filtros)
+# ==========================================
+st.sidebar.title("🚰 Monitor SISS")
+modo_visualizacion = st.sidebar.radio(
+    "Seleccione análisis:",
+    options=["Análisis Temporal", "Radar de Riesgos (Comparativo)"],
+    index=0
 )
 
-# -------------------------------------------------------------------
-# SIDEBAR
-# -------------------------------------------------------------------
-st.sidebar.header("Filtros")
+st.sidebar.markdown("---")
 
-# Ciudades para análisis temporal
-selected_cities = st.sidebar.multiselect(
-    "Seleccione una ciudad:",
-    options=comunas,
-    default=[comunas[0]] if comunas else [],
-)
+# ==========================================
+# VISTA 1: ANÁLISIS TEMPORAL
+# ==========================================
+if modo_visualizacion == "Análisis Temporal":
+    
+    st.sidebar.subheader("🛠️ Filtros")
+    selected_param = st.sidebar.selectbox("Parámetro", all_params, index=0)
+    
+    # Multiselect inteligente: si hay una sola comuna en data, la selecciona por defecto
+    default_comuna = [all_comunas[0]] if all_comunas else []
+    selected_comunas = st.sidebar.multiselect("Comunas", all_comunas, default=default_comuna)
+    
+    min_date = df_raw["DateTime"].min()
+    max_date = df_raw["DateTime"].max()
+    date_range = st.sidebar.date_input(
+        "Rango de Fechas",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date
+    )
 
-# Parámetro
-default_index = 6 if len(parametros) > 6 else 0
-selected_parameter = st.sidebar.selectbox(
-    "Seleccione parámetro:",
-    options=parametros,
-    index=default_index,
-)
-
-# Rango de fechas (texto)
-min_date = df.index.min().date()
-max_date = df.index.max().date()
-st.sidebar.write("Ingrese rango de fechas en formato YYYY-MM-DD:")
-start_str = st.sidebar.text_input("Fecha inicio:", value=min_date)
-end_str = st.sidebar.text_input("Fecha fin:", value=max_date)
-
-# Convertir las cadenas a tipo fecha
-try:
-    start_date = pd.to_datetime(start_str).date()
-    end_date = pd.to_datetime(end_str).date()
-    if start_date > end_date:
-        st.sidebar.error("La fecha de inicio no puede ser mayor que la fecha fin.")
-except ValueError:
-    st.sidebar.error("Formato de fecha inválido. Usa YYYY-MM-DD.")
-    start_date = df.index.min().date()
-    end_date = df.index.max().date()
-
-# Controles para clasificación por máximos
-st.sidebar.header("Clasificación por máximos")
-
-opciones_comuna_ficha = ["(Usar comuna con máximo más alto)"] + comunas
-selected_city_max_label = st.sidebar.selectbox(
-    "Comuna para ficha de máximos:",
-    options=opciones_comuna_ficha,
-    index=0,
-)
-selected_city_max = (
-    None
-    if selected_city_max_label == "(Usar comuna con máximo más alto)"
-    else selected_city_max_label
-)
-
-# Disclaimer
-st.sidebar.markdown("\n💧 Notas:\n", unsafe_allow_html=True)
-st.sidebar.markdown(
-    """
-    Algunas comunas pueden estar embebidas en servicios más grandes como "Gran Santiago" 
-    que contiene a Santiago Centro, Ñuñoa, Providencia, etc.  
-    Actualmente no se tiene el detalle de qué comunas componen cada servicio/concesión de agua potable.
-    """,
-    unsafe_allow_html=True,
-)
-
-# -------------------------------------------------------------------
-# FILTRADO GENERAL POR RANGO DE FECHAS
-# -------------------------------------------------------------------
-mask_time = (df.index.date >= start_date) & (df.index.date <= end_date)
-
-# -------------------------------------------------------------------
-# 1) ANÁLISIS TEMPORAL (usa ciudades seleccionadas)
-# -------------------------------------------------------------------
-if not selected_cities:
-    st.warning("No se ha seleccionado ninguna ciudad. Se usará la primera disponible.")
-    selected_cities = [comunas[0]] if comunas else []
-
-mask_temporal = df["Comuna"].isin(selected_cities) & (df["Parametro"] == selected_parameter)
-filtered_data = df[mask_temporal & mask_time].copy()
-
-if not filtered_data.empty:
-    try:
-        filtered_data["Valor"] = filtered_data["Valor"].astype(float)
-    except Exception as e:
-        st.error(f"Error al convertir los valores a float: {e}")
-
-# -------------------------------------------------------------------
-# 2) CLASIFICACIÓN POR MÁXIMOS - RANKING GLOBAL POR PARÁMETRO
-# -------------------------------------------------------------------
-df_param = df[(df["Parametro"] == selected_parameter) & mask_time].copy()
-
-ranking_fig = None
-maxima_table = None
-
-if not df_param.empty:
-    # Aseguramos Valor numérico
-    df_param["Valor"] = pd.to_numeric(df_param["Valor"], errors="coerce")
-    df_param = df_param.dropna(subset=["Valor"])
-
-    if not df_param.empty:
-        # Agregamos por comuna:
-        # - Valor_max = máximo del parámetro
-        # - Fecha_max = fecha (índice) en que ocurre ese máximo
-        # - Limite = máximo del límite numérico (por seguridad)
-        grouped = (
-            df_param.groupby("Comuna")
-            .agg(
-                Valor_max=("Valor", "max"),
-                Fecha_max=("Valor", lambda s: s.idxmax()),
-                Limite=("Limite", lambda x: pd.to_numeric(x, errors="coerce").max()),
-            )
-            .reset_index()
-        )
-
-        if not grouped.empty:
-            grouped["Fecha máximo"] = grouped["Fecha_max"].dt.strftime("%Y-%m-%d")
-            grouped.drop(columns=["Fecha_max"], inplace=True)
-
-            # Ordenamos por Valor máximo (descendente)
-            grouped = grouped.sort_values("Valor_max", ascending=False)
-
-            # Guardamos tabla completa de máximos por comuna
-            maxima_table = grouped.copy()
-            maxima_table.rename(
-                columns={"Valor_max": "Valor máximo", "Limite": "Límite"},
-                inplace=True,
-            )
-
-            # TOMAMOS SIEMPRE TOP 5 COMUNAS
-            top_grouped = grouped.head(5)
-
-            # Gráfico de ranking (Top 5)
-            ranking_fig = px.bar(
-                top_grouped,
-                x="Valor_max",
-                y="Comuna",
-                orientation="h",
-                text="Valor_max",
-                title=f"Top 5 comunas por máximo de {selected_parameter}",
-            )
-            ranking_fig.update_layout(
-                yaxis={"categoryorder": "total ascending"},
-                xaxis_title="Valor máximo",
-                margin=dict(l=80, r=40, t=60, b=40),
-            )
-
-            # Línea de límite normativo si existe
-            limites_unicos = (
-                pd.to_numeric(df_param["Limite"], errors="coerce").dropna().unique()
-            )
-            if limites_unicos.size > 0:
-                limite_val = float(limites_unicos[0])
-                ranking_fig.add_vline(
-                    x=limite_val,
-                    line_dash="dash",
-                    line_color="red",
-                    annotation_text="Límite",
-                    annotation_position="top",
-                )
-
-# -------------------------------------------------------------------
-# 3) FICHA DE COMUNA - PERFIL DE MÁXIMOS POR PARÁMETRO (RADAR)
-# -------------------------------------------------------------------
-radar_fig = None
-city_max_table = None
-city_for_profile = selected_city_max
-
-if maxima_table is not None and not maxima_table.empty:
-    # Si no se eligió comuna explícita, usamos la comuna con mayor Valor máximo
-    if city_for_profile is None:
-        city_for_profile = maxima_table.iloc[0]["Comuna"]
-
-    df_city = df[(df["Comuna"] == city_for_profile) & mask_time].copy()
-
-    if not df_city.empty:
-        df_city["Valor"] = pd.to_numeric(df_city["Valor"], errors="coerce")
-        df_city = df_city.dropna(subset=["Valor"])
-
-        if not df_city.empty:
-            city_grouped = (
-                df_city.groupby("Parametro")
-                .agg(
-                    Valor_max=("Valor", "max"),
-                    Limite=(
-                        "Limite",
-                        lambda x: pd.to_numeric(x, errors="coerce").max(),
-                    ),
-                )
-                .reset_index()
-            )
-
-            # Excluir parámetros discretos del radar
-            city_grouped = city_grouped[~city_grouped["Parametro"].isin(param_disc)]
-
-            if not city_grouped.empty:
-                # Ratio contra norma (si existe límite > 0)
-                def _ratio(row):
-                    lim = row["Limite"]
-                    if pd.notnull(lim) and lim > 0:
-                        return row["Valor_max"] / lim
-                    return None
-
-                city_grouped["Ratio_norma"] = city_grouped.apply(_ratio, axis=1)
-
-                # Ordenar por nombre de parámetro
-                city_grouped_sorted = city_grouped.sort_values("Parametro")
-                categorias = city_grouped_sorted["Parametro"].tolist()
-
-                ratios = []
-                for _, row in city_grouped_sorted.iterrows():
-                    r = row["Ratio_norma"]
-                    if pd.notnull(r):
-                        ratios.append(r)
-                    else:
-                        # Normalizar respecto al máximo global de ese parámetro
-                        df_param_all = df[
-                            (df["Parametro"] == row["Parametro"]) & mask_time
-                        ].copy()
-                        df_param_all["Valor"] = pd.to_numeric(
-                            df_param_all["Valor"], errors="coerce"
-                        )
-                        df_param_all = df_param_all.dropna(subset=["Valor"])
-                        if not df_param_all.empty:
-                            max_global = df_param_all["Valor"].max()
-                            ratios.append(
-                                row["Valor_max"] / max_global if max_global > 0 else 0.0
-                            )
-                        else:
-                            ratios.append(0.0)
-
-                if ratios:
-                    categorias_cerradas = categorias + [categorias[0]]
-                    ratios_cerrados = ratios + [ratios[0]]
-
-                    max_ratio = max(ratios)
-                    radial_max = max(1.2, max_ratio * 1.1)
-
-                    radar_fig = go.Figure()
-                    radar_fig.add_trace(
-                        go.Scatterpolar(
-                            r=ratios_cerrados,
-                            theta=categorias_cerradas,
-                            fill="toself",
-                            name=city_for_profile,
-                        )
-                    )
-                    radar_fig.update_layout(
-                        title=f"Perfil de máximos normalizados - {city_for_profile}",
-                        polar=dict(
-                            radialaxis=dict(visible=True, range=[0, radial_max])
-                        ),
-                        showlegend=False,
-                    )
-
-                    # Tabla para la comuna
-                    city_max_table = city_grouped_sorted.copy()
-                    city_max_table.rename(
-                        columns={
-                            "Parametro": "Parámetro",
-                            "Valor_max": "Valor máximo",
-                            "Limite": "Límite",
-                            "Ratio_norma": "Ratio vs norma",
-                        },
-                        inplace=True,
-                    )
-                    city_max_table["Ratio vs norma"] = city_max_table[
-                        "Ratio vs norma"
-                    ].apply(lambda x: round(x, 2) if pd.notnull(x) else None)
-
-# -------------------------------------------------------------------
-# LAYOUT PRINCIPAL CON PESTAÑAS
-# -------------------------------------------------------------------
-tab1, tab2 = st.tabs(["Análisis temporal", "Clasificación por máximos"])
-
-# ================== TAB 1: ANÁLISIS TEMPORAL =====================
-with tab1:
-    if filtered_data.empty:
-        st.warning("No hay valores para estas condiciones.")
+    st.title(f"📈 Evolución: {selected_param}")
+    
+    if not selected_comunas:
+        st.warning("Seleccione al menos una comuna en la barra lateral.")
     else:
-        filtered_data = filtered_data.sort_index()
-        unidad = (
-            filtered_data["Unidad"].unique()[0]
-            if "Unidad" in filtered_data.columns
-            else ""
+        # Filtrado
+        mask = (
+            (df_raw["Parametro"] == selected_param) & 
+            (df_raw["Comuna"].isin(selected_comunas)) &
+            (df_raw["DateTime"] >= pd.to_datetime(date_range[0])) &
+            (df_raw["DateTime"] <= pd.to_datetime(date_range[1]))
         )
-
-        # ----- Gráfico de línea -----
-        line_fig = px.line(
-            filtered_data,
-            x=filtered_data.index,
-            y="Valor",
-            color="Comuna",
-            title=f"{selected_parameter}",
-            markers=True,
-        )
-        line_fig.update_layout(
-            legend=dict(y=-0.15, orientation="h"),
-            margin=dict(r=30),
-            xaxis_title="Fecha",
-            yaxis_title=f"Valor ({unidad})",
-        )
-        line_fig.update_xaxes(tickmode="auto", nticks=8)
-
-        # Líneas de referencia
-        if selected_parameter in lims.keys():
-            line_fig.add_hline(
-                y=lims[selected_parameter]["lim_max"],
-                line_dash="dash",
-                line_color="red",
-                annotation_text="Límite Superior",
-                annotation_position="bottom right",
-            )
-            line_fig.add_hline(
-                y=lims[selected_parameter]["lim_min"],
-                line_dash="dash",
-                line_color="red",
-                annotation_text="Límite Inferior",
-                annotation_position="bottom right",
-            )
+        df_filtered = df_raw[mask].copy()
+        
+        if df_filtered.empty:
+            st.info("No hay datos disponibles para esta selección.")
         else:
-            if "Limite" in filtered_data.columns:
-                try:
-                    limite_value = float(filtered_data["Limite"].unique()[0])
-                    line_fig.add_hline(
-                        y=limite_value,
-                        line_dash="dash",
-                        line_color="red",
-                        annotation_text="Límite",
-                        annotation_position="bottom right",
-                    )
-                except Exception:
-                    pass
-
-        # ----- Histograma -----
-        hist_fig = px.histogram(
-            filtered_data,
-            x="Valor",
-            color="Comuna",
-            opacity=0.5,
-            histnorm="percent",
-            title=f"Histograma - {selected_parameter}",
-        )
-        hist_fig.update_layout(
-            legend=dict(y=-0.15, orientation="h"),
-            margin=dict(r=30),
-            yaxis_title="Porcentaje (%)",
-            xaxis_title=f"Valor ({unidad})",
-        )
-        hist_fig.update_xaxes(tickmode="auto", nticks=6)
-
-        if selected_parameter in lims.keys():
-            hist_fig.add_vline(
-                x=lims[selected_parameter]["lim_max"],
-                line_dash="dash",
-                line_color="red",
-                annotation_text="Límite Superior",
-                annotation_position="top",
+            # 1. Gráfico Principal
+            fig_line = px.line(
+                df_filtered, x="DateTime", y="Valor", color="Comuna", 
+                markers=True, title=f"Serie Temporal - {selected_param}",
+                labels={"Valor": f"Valor ({df_filtered['Unidad'].iloc[0]})"}
             )
-            hist_fig.add_vline(
-                x=lims[selected_parameter]["lim_min"],
-                line_dash="dash",
-                line_color="red",
-                annotation_text="Límite Inferior",
-                annotation_position="top",
-            )
-        else:
-            if "Limite" in filtered_data.columns:
-                try:
-                    limite_value = float(filtered_data["Limite"].unique()[0])
-                    hist_fig.add_vline(
-                        x=limite_value,
-                        line_dash="dash",
-                        line_color="red",
-                        annotation_text="Límite",
-                        annotation_position="top",
-                    )
-                except Exception:
-                    pass
+            
+            # Líneas de límite normativo
+            if selected_param in LIMS:
+                limits = LIMS[selected_param]
+                if "lim_max" in limits and limits["lim_max"] > 0:
+                    fig_line.add_hline(y=limits["lim_max"], line_dash="dash", line_color="red", annotation_text="Límite Max")
+                if "lim_min" in limits:
+                    fig_line.add_hline(y=limits["lim_min"], line_dash="dash", line_color="orange", annotation_text="Límite Min")
 
-        # ----- Estadísticas numéricas -----
-        stats_numeric = (
-            filtered_data.groupby("Comuna")["Valor"].describe().T.round(2)
-        )
-        stats_numeric = stats_numeric.rename_axis("Variable").reset_index()
+            st.plotly_chart(fig_line, use_container_width=True)
+            
+            # 2. Métricas y KPIs (Mejora visual)
+            st.subheader("📊 Estado Actual (Último Registro)")
+            cols_kpi = st.columns(len(selected_comunas))
+            
+            # Mostrar tarjeta KPI para cada comuna seleccionada (hasta 4 columnas para no saturar)
+            # Si son muchas, se mostrarán en filas
+            for idx, comuna in enumerate(selected_comunas):
+                col_idx = idx % 4
+                if idx > 0 and idx % 4 == 0:
+                    cols_kpi = st.columns(4) # Nueva fila
+                
+                df_c = df_filtered[df_filtered["Comuna"] == comuna].sort_values("DateTime")
+                if not df_c.empty:
+                    last_val = df_c.iloc[-1]["Valor"]
+                    last_date_str = df_c.iloc[-1]["DateTime"].strftime("%d/%m/%Y")
+                    
+                    # Calcular delta si hay más de 1 dato
+                    delta = None
+                    if len(df_c) > 1:
+                        prev_val = df_c.iloc[-2]["Valor"]
+                        delta = round(last_val - prev_val, 4)
+                    
+                    with cols_kpi[col_idx]:
+                        st.metric(
+                            label=f"{comuna}",
+                            value=f"{last_val} {df_c.iloc[0]['Unidad']}",
+                            delta=delta,
+                            help=f"Fecha medición: {last_date_str}"
+                        )
 
-        rename_map = {
-            "count": "Conteo",
-            "mean": "Media",
-            "std": "Desv.Est",
-            "min": "Min",
-            "25%": "Q1",
-            "50%": "Q2",
-            "75%": "Q3",
-            "max": "Max",
-        }
-        stats_numeric["Variable"] = stats_numeric["Variable"].map(rename_map)
-
-        # Último valor y fecha por comuna
-        last_values_list = []
-        for city in selected_cities:
-            city_data = filtered_data[filtered_data["Comuna"] == city]
-            if not city_data.empty:
-                last_val = round(city_data["Valor"].iloc[-1], 2)
-                last_date = city_data.index[-1].strftime("%b-%Y")
-                last_values_list.append(
-                    {
-                        "Comuna": city,
-                        "Último Valor": last_val,
-                        "Última Fecha": last_date,
-                    }
+            # 3. Estadísticas y Descarga
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                st.subheader("Resumen Estadístico")
+                stats = df_filtered.groupby("Comuna")["Valor"].describe()[['count', 'mean', 'max', 'min']]
+                st.dataframe(stats.style.format("{:.3f}"), use_container_width=True)
+                
+            with col2:
+                st.subheader("Exportar Datos")
+                st.write("Descargue los datos filtrados para su propio análisis.")
+                csv = df_filtered.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    "📥 Descargar CSV Filtrado",
+                    data=csv,
+                    file_name=f"datos_{selected_param}.csv",
+                    mime="text/csv",
+                    key='download-csv'
                 )
-        last_values_df = pd.DataFrame(last_values_list)
 
-        # Visualización final tab 1
-        st.plotly_chart(line_fig, use_container_width=True)
-        col1, col2 = st.columns(2)
-        with col1:
-            st.plotly_chart(hist_fig, use_container_width=True)
-        with col2:
-            st.subheader("Estadísticas Numéricas")
-            st.dataframe(stats_numeric)
-            if not last_values_df.empty:
-                st.subheader("Última Medición")
-                st.dataframe(last_values_df)
+# ==========================================
+# VISTA 2: RADAR DE RIESGOS
+# ==========================================
+elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
+    
+    st.sidebar.subheader("⚙️ Configuración Radar")
+    st.sidebar.info(
+        "Muestra el **máximo histórico del último año móvil** (últimos 365 días de datos) "
+        "normalizado respecto a la norma. Valor > 1.0 indica fuera de norma."
+    )
+    
+    radar_comunas = st.sidebar.multiselect(
+        "Comunas a comparar", all_comunas, 
+        default=all_comunas[:2] if len(all_comunas) > 1 else all_comunas
+    )
+    
+    params_avail = [p for p in all_params if p in LIMS]
+    radar_params = st.sidebar.multiselect(
+        "Parámetros", params_avail, default=params_avail
+    )
 
-# ================== TAB 2: CLASIFICACIÓN POR MÁXIMOS =====================
-with tab2:
-    st.subheader(f"Top 5 comunas por máximos de {selected_parameter}")
-
-    if ranking_fig is None:
-        st.info(
-            "No se pudo construir el ranking de máximos para el parámetro y rango de fechas seleccionados."
-        )
+    st.title("🕸️ Radar de Riesgos Multidimensional")
+    
+    if not radar_comunas or not radar_params:
+        st.warning("Seleccione al menos una comuna y parámetros.")
     else:
-        st.plotly_chart(ranking_fig, use_container_width=True)
-        with st.expander("Ver tabla de máximos por comuna (todas)"):
-            st.dataframe(maxima_table)
+        fig_radar = go.Figure()
+        data_exists = False
+        
+        # Guardar datos para tabla resumen
+        summary_data = []
 
-    st.markdown("---")
-    st.subheader("Ficha de comuna - perfil de máximos por parámetro")
+        for comuna in radar_comunas:
+            r_values = []
+            theta_values = []
+            
+            df_comuna = df_raw[df_raw["Comuna"] == comuna]
+            if df_comuna.empty: continue
+                
+            # Buscar último año de datos de ESA comuna
+            last_date = df_comuna["DateTime"].max()
+            start_date = last_date - timedelta(days=365)
+            df_last_year = df_comuna[df_comuna["DateTime"] >= start_date]
+            
+            if df_last_year.empty: continue
+            
+            # Calcular scores
+            comuna_has_data = False
+            for param in radar_params:
+                df_p = df_last_year[df_last_year["Parametro"] == param]
+                if not df_p.empty:
+                    max_val = df_p["Valor"].max()
+                    ref_val = LIMS[param]["ref"]
+                    norm_score = max_val / ref_val if ref_val > 0 else 0
+                    
+                    r_values.append(norm_score)
+                    theta_values.append(param)
+                    comuna_has_data = True
+                    
+                    # Agregar a resumen
+                    summary_data.append({
+                        "Comuna": comuna,
+                        "Parámetro": param,
+                        "Max Valor (Año)": max_val,
+                        "Límite Ref": ref_val,
+                        "Indice Riesgo": round(norm_score, 2),
+                        "Última Fecha": last_date.date()
+                    })
+                else:
+                    r_values.append(0)
+                    theta_values.append(param)
+            
+            if comuna_has_data:
+                r_values.append(r_values[0])
+                theta_values.append(theta_values[0])
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=r_values, theta=theta_values, fill='toself', name=f"{comuna}"
+                ))
+                data_exists = True
 
-    if radar_fig is None or city_max_table is None:
-        st.info(
-            "No hay datos suficientes para construir la ficha de comuna en el rango seleccionado."
-        )
-    else:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.plotly_chart(radar_fig, use_container_width=True)
-        with col2:
-            st.subheader(f"Máximos por parámetro - {city_for_profile}")
-            st.dataframe(city_max_table)
+        if data_exists:
+            # Línea de límite = 1.0
+            line_ref = [1.0] * (len(radar_params) + 1)
+            line_theta = radar_params + [radar_params[0]]
+            fig_radar.add_trace(go.Scatterpolar(
+                r=line_ref, theta=line_theta, mode='lines', 
+                line=dict(color='red', dash='dash', width=2),
+                name='Límite (100%)', hoverinfo='skip'
+            ))
+
+            fig_radar.update_layout(
+                polar=dict(radialaxis=dict(visible=True, range=[0, max(2.0, max([t.r for t in fig_radar.data if hasattr(t, 'r') and t.r])*1.1)])),
+                height=600, showlegend=True
+            )
+            st.plotly_chart(fig_radar, use_container_width=True)
+            
+            # Tabla de detalles debajo del radar
+            st.subheader("Detalle de valores críticos")
+            df_summary = pd.DataFrame(summary_data)
+            if not df_summary.empty:
+                # Ordenar por riesgo descendente
+                df_summary = df_summary.sort_values("Indice Riesgo", ascending=False)
+                
+                # Función para colorear filas peligrosas
+                def highlight_risk(val):
+                    color = 'red' if val > 1.0 else 'orange' if val > 0.8 else 'green'
+                    return f'color: {color}; font-weight: bold'
+
+                st.dataframe(
+                    df_summary.style.applymap(highlight_risk, subset=['Indice Riesgo'])
+                    .format({"Max Valor (Año)": "{:.4f}", "Indice Riesgo": "{:.2f}"}),
+                    use_container_width=True, hide_index=True
+                )
+        else:
+            st.info("No hay datos suficientes en el último año móvil para generar el radar.")
+
+# ==========================================
+# FOOTER / ACERCA DE
+# ==========================================
+st.sidebar.markdown("---")
+with st.sidebar.expander("ℹ️ Acerca de"):
+    st.markdown("""
+    **Monitor de Calidad de Agua**
+    
+    Esta herramienta visualiza datos públicos de calidad del agua.
+    
+    - **Código Fuente:** [GitHub: chile-waterquality](https://github.com/luchoplaza/chile-waterquality)
+    - **Datos:** Extraídos de reportes SISS.
+    - **Desarrollador:** Lucho Plaza.
+    """)
+    st.caption("v1.2 - Streamlit Edition")
