@@ -6,12 +6,13 @@ import streamlit as st
 from datetime import timedelta
 
 # Librerías de Machine Learning
+# Se envuelven en try/except para manejar entornos donde no estén instaladas
 try:
     from sklearn.preprocessing import StandardScaler
     from sklearn.decomposition import PCA
     from sklearn.cluster import KMeans
 except ImportError:
-    st.error("Falta instalar scikit-learn. Por favor agrégalo a requirements.txt")
+    st.error("⚠️ Falta instalar scikit-learn. Por favor agrega 'scikit-learn' a tu archivo requirements.txt")
 
 # ==========================================
 # CONFIGURACIÓN DE LA PÁGINA
@@ -23,7 +24,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS personalizados para métricas
+# Estilos CSS personalizados para métricas y tablas
 st.markdown("""
 <style>
     [data-testid="stMetricValue"] {
@@ -37,8 +38,6 @@ st.markdown("""
 # ==========================================
 def get_comuna_region_map():
     """Retorna un diccionario para mapear Comuna -> Región."""
-    # Nota: Este es un mapeo simplificado para las principales comunas/sistemas.
-    # En un entorno real, idealmente cargarías esto desde un CSV maestro de geografía.
     return {
         # XV Arica y Parinacota
         "ARICA": "Arica y Parinacota", "PUTRE": "Arica y Parinacota",
@@ -75,11 +74,11 @@ def get_comuna_region_map():
     }
 
 # ==========================================
-# CARGA DE DATOS
+# CARGA DE DATOS (ROBUSTA)
 # ==========================================
 @st.cache_data
 def load_data():
-    """Carga los datos originales, formatea fechas y agrega regiones."""
+    """Carga los datos originales, formatea fechas y agrega regiones. Maneja errores de archivo vacío."""
     script_dir = os.path.abspath(os.path.dirname(__file__))
     
     # Lista de rutas posibles ordenadas por prioridad
@@ -115,12 +114,10 @@ def load_data():
         df["Valor"] = df["Valor"].astype(str).str.replace(",", ".").replace("Ausencia", "0")
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce")
     
-    # --- NUEVO: Agregar columna Región ---
+    # --- Mapeo de Regiones ---
     region_map = get_comuna_region_map()
-    # Normalizar a mayúsculas para el mapeo y limpiar espacios
     df["Comuna_Norm"] = df["Comuna"].str.upper().str.strip()
     df["Region"] = df["Comuna_Norm"].map(region_map).fillna("Otra / No Identificada")
-    # Limpiamos la columna auxiliar
     df = df.drop(columns=["Comuna_Norm"])
     
     return df.sort_values("DateTime")
@@ -153,24 +150,23 @@ LIMS = {
 
 param_disc = ["OLOR", "COLOR VERDADERO", "SABOR"]
 all_params = [p for p in df_raw["Parametro"].unique() if p not in param_disc]
-all_regions = sorted(df_raw["Region"].unique()) # Lista de regiones
+all_regions = sorted(df_raw["Region"].unique())
 
 # ==========================================
-# BARRA LATERAL (Navegación y Filtros Globales de Geo)
+# BARRA LATERAL
 # ==========================================
 st.sidebar.title("Water Quality Chile")
 
-# --- NUEVO: Filtro de Región en Sidebar (Afecta la lista de comunas disponibles) ---
+# --- Filtro de Región ---
 st.sidebar.header("📍 Ubicación Geográfica")
-# Por defecto seleccionamos todas o una específica si prefieres
 selected_regions = st.sidebar.multiselect(
     "Filtrar por Región",
     all_regions,
-    default=all_regions, # Por defecto todas seleccionadas para no ocultar datos
+    default=all_regions,
     help="Seleccione una o más regiones para filtrar la lista de comunas."
 )
 
-# Filtramos la lista de comunas basada en la región seleccionada
+# Filtramos la lista de comunas globalmente según región
 if selected_regions:
     comunas_filtered = sorted(df_raw[df_raw["Region"].isin(selected_regions)]["Comuna"].unique())
 else:
@@ -205,7 +201,7 @@ if modo_visualizacion == "Análisis Temporal":
 
     selected_param = st.sidebar.selectbox("Parámetro", all_params, index=default_param_index)
     
-    # Lógica de defaults para comunas (debe estar dentro de las filtradas por región)
+    # Lógica de defaults
     default_target = "COPIAPO"
     default_selection = []
     if default_target in comunas_filtered:
@@ -230,7 +226,6 @@ if modo_visualizacion == "Análisis Temporal":
 
     st.title("Dashboard Calidad de agua potable Chile")
     
-    # Mostrar región en subtítulo si hay 1 comuna seleccionada
     if len(selected_comunas) == 1:
         reg = df_raw[df_raw["Comuna"] == selected_comunas[0]]["Region"].iloc[0]
         st.markdown(f"**Comuna:** {selected_comunas[0]} ({reg}) | **Parámetro:** {selected_param}")
@@ -251,12 +246,11 @@ if modo_visualizacion == "Análisis Temporal":
         if df_filtered.empty:
             st.info("No hay datos disponibles para esta selección.")
         else:
-            # 1. Gráfico
+            # Gráfico Línea
             fig_line = px.line(
                 df_filtered, x="DateTime", y="Valor", color="Comuna", 
                 markers=True, title=f"Serie Temporal - {selected_param}",
                 labels={"Valor": f"Valor ({df_filtered['Unidad'].iloc[0]})"},
-                # Agregamos Región al hover
                 hover_data={"Region": True}
             )
             
@@ -269,7 +263,7 @@ if modo_visualizacion == "Análisis Temporal":
 
             st.plotly_chart(fig_line, use_container_width=True)
             
-            # 2. KPIs
+            # KPIs
             st.subheader("📊 Estado Actual (Último Registro)")
             cols_kpi = st.columns(len(selected_comunas))
             
@@ -296,7 +290,7 @@ if modo_visualizacion == "Análisis Temporal":
                             help=f"Fecha medición: {last_date_str}"
                         )
 
-            # 3. Histograma y Stats
+            # Histograma y Tabla
             col1, col2 = st.columns([1, 1])
             with col1:
                 st.subheader("Histograma")
@@ -310,7 +304,6 @@ if modo_visualizacion == "Análisis Temporal":
                 st.subheader("Resumen Estadístico")
                 stats = df_filtered.groupby("Comuna")["Valor"].describe()[['count', 'mean', 'max', 'min', 'std']]
                 last_dates = df_filtered.groupby("Comuna")["DateTime"].max().dt.strftime('%m-%Y')
-                # Agregamos región a la tabla resumen
                 regions_summary = df_filtered.groupby("Comuna")["Region"].first()
                 
                 stats["Región"] = regions_summary
@@ -335,12 +328,9 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
     st.sidebar.subheader("⚙️ Configuración Radar")
     st.sidebar.info("Comparación multidimensional normalizada (Valor / Límite).")
     
-    # Defaults considerando el filtro de regiones
     default_radar_comunas = ["COPIAPO", "VALPARAISO"]
-    # Solo mantener los defaults si están en la lista filtrada actual
     default_radar_comunas = [c for c in default_radar_comunas if c in comunas_filtered]
     
-    # Si los defaults no están disponibles (ej: filtraste solo Región Metropolitana), tomar los primeros disponibles
     if len(default_radar_comunas) < 2 and len(comunas_filtered) >= 2:
         default_radar_comunas = comunas_filtered[:2]
 
@@ -377,7 +367,6 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
             df_comuna = df_raw[df_raw["Comuna"] == comuna]
             if df_comuna.empty: continue
             
-            # Obtener región para mostrar en tabla
             region_name = df_comuna["Region"].iloc[0]
                 
             last_date = df_comuna["DateTime"].max()
@@ -459,7 +448,7 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
             st.info("No hay datos suficientes en el último año móvil.")
 
 # ==========================================
-# VISTA 3: CLUSTERING IA
+# VISTA 3: CLUSTERING IA (NUEVO)
 # ==========================================
 elif modo_visualizacion == "Clustering IA (Perfiles de Agua)":
     st.title("🤖 Clustering de Perfiles de Agua (IA)")
@@ -514,14 +503,22 @@ elif modo_visualizacion == "Clustering IA (Perfiles de Agua)":
             df_results["Region"] = df_results.index.map(region_map_info)
 
             st.subheader("Mapa de Similitud (PCA)")
+            st.info("💡 **Colores = Región** | **Formas = Cluster**. Observa si las comunas de una misma región se agrupan juntas.")
+
             fig_pca = px.scatter(
                 df_results.reset_index(),
-                x="PC1", y="PC2", color="Cluster",
+                x="PC1", y="PC2", 
+                color="Region",  # Colorear por Región Geográfica
+                symbol="Cluster", # Forma según el Cluster IA
                 hover_name="Comuna",
-                hover_data={"Region": True},
-                title=f"Agrupación de Comunas (K={n_clusters})",
+                hover_data={"Region": True, "Cluster": True},
+                title=f"Relación Geografía vs Química del Agua (K={n_clusters})",
                 color_discrete_sequence=px.colors.qualitative.Bold
             )
+            
+            # Aumentar tamaño de puntos y borde para mejor visibilidad
+            fig_pca.update_traces(marker=dict(size=12, line=dict(width=1, color='DarkSlateGrey')))
+            
             st.plotly_chart(fig_pca, use_container_width=True)
             
             # Radar de Clusters
@@ -558,7 +555,6 @@ elif modo_visualizacion == "Clustering IA (Perfiles de Agua)":
                     with col:
                         st.success(f"**Cluster {cluster_id}** ({len(comunas_in_cluster)} comunas)")
                         for c in comunas_in_cluster[:15]:
-                            # Mostrar región junto al nombre
                             reg = df_results.loc[c, "Region"]
                             st.write(f"- {c} <span style='color:gray;font-size:0.8em'>({reg})</span>", unsafe_allow_html=True)
                         if len(comunas_in_cluster) > 15:
