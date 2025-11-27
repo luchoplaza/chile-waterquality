@@ -6,9 +6,12 @@ import streamlit as st
 from datetime import timedelta
 
 # Librerías de Machine Learning
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans
+try:
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.decomposition import PCA
+    from sklearn.cluster import KMeans
+except ImportError:
+    st.error("Falta instalar scikit-learn. Por favor agrégalo a requirements.txt")
 
 # ==========================================
 # CONFIGURACIÓN DE LA PÁGINA
@@ -30,13 +33,54 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
+# DICCIONARIO DE REGIONES (MAPEO)
+# ==========================================
+def get_comuna_region_map():
+    """Retorna un diccionario para mapear Comuna -> Región."""
+    # Nota: Este es un mapeo simplificado para las principales comunas/sistemas.
+    # En un entorno real, idealmente cargarías esto desde un CSV maestro de geografía.
+    return {
+        # XV Arica y Parinacota
+        "ARICA": "Arica y Parinacota", "PUTRE": "Arica y Parinacota",
+        # I Tarapacá
+        "IQUIQUE": "Tarapacá", "ALTO HOSPICIO": "Tarapacá", "PICA": "Tarapacá", "POZO ALMONTE": "Tarapacá",
+        # II Antofagasta
+        "ANTOFAGASTA": "Antofagasta", "CALAMA": "Antofagasta", "TOCOPILLA": "Antofagasta", "MEJILLONES": "Antofagasta", "TALTAL": "Antofagasta", "SAN PEDRO DE ATACAMA": "Antofagasta",
+        # III Atacama
+        "COPIAPO": "Atacama", "VALLENAR": "Atacama", "CALDERA": "Atacama", "CHAÑARAL": "Atacama", "DIEGO DE ALMAGRO": "Atacama", "HUASCO": "Atacama", "TIERRA AMARILLA": "Atacama",
+        # IV Coquimbo
+        "LA SERENA": "Coquimbo", "COQUIMBO": "Coquimbo", "OVALLE": "Coquimbo", "ILLAPEL": "Coquimbo", "VICUÑA": "Coquimbo", "SALAMANCA": "Coquimbo", "LOS VILOS": "Coquimbo", "ANDACOLLO": "Coquimbo",
+        # V Valparaíso
+        "VALPARAISO": "Valparaíso", "VIÑA DEL MAR": "Valparaíso", "QUILPUE": "Valparaíso", "VILLA ALEMANA": "Valparaíso", "SAN ANTONIO": "Valparaíso", "QUILLOTA": "Valparaíso", "LOS ANDES": "Valparaíso", "SAN FELIPE": "Valparaíso", "LA LIGUA": "Valparaíso", "LIMACHE": "Valparaíso", "CONCON": "Valparaíso", "QUINTERO": "Valparaíso", "PUCHUNCAVI": "Valparaíso", "CASABLANCA": "Valparaíso",
+        # RM Metropolitana
+        "SANTIAGO": "Metropolitana", "PUENTE ALTO": "Metropolitana", "MAIPU": "Metropolitana", "LA FLORIDA": "Metropolitana", "LAS CONDES": "Metropolitana", "SAN BERNARDO": "Metropolitana", "PEÑALOLEN": "Metropolitana", "QUILICURA": "Metropolitana", "SANTIAGO CENTRO": "Metropolitana", "PROVIDENCIA": "Metropolitana", "ÑUÑOA": "Metropolitana", "COLINA": "Metropolitana", "LAMPA": "Metropolitana", "TIL TIL": "Metropolitana", "BUIN": "Metropolitana", "PAINE": "Metropolitana", "TALAGANTE": "Metropolitana", "MELIPILLA": "Metropolitana", "CURACAVI": "Metropolitana", "HACIENDA BATUCO": "Metropolitana", "REINA NORTE": "Metropolitana", "EL COLORADO": "Metropolitana", "LA PARVA": "Metropolitana", "VALLE NEVADO": "Metropolitana",
+        # VI O'Higgins
+        "RANCAGUA": "O'Higgins", "MACHALI": "O'Higgins", "SAN FERNANDO": "O'Higgins", "RENGO": "O'Higgins", "SAN VICENTE": "O'Higgins", "SANTA CRUZ": "O'Higgins", "CHIMBARONGO": "O'Higgins", "PICHILEMU": "O'Higgins",
+        # VII Maule
+        "TALCA": "Maule", "CURICO": "Maule", "LINARES": "Maule", "CONSTITUCION": "Maule", "CAUQUENES": "Maule", "MOLINA": "Maule", "PARRAL": "Maule", "SAN JAVIER": "Maule",
+        # VIII Biobío
+        "CONCEPCION": "Biobío", "TALCAHUANO": "Biobío", "CHIGUAYANTE": "Biobío", "SAN PEDRO DE LA PAZ": "Biobío", "LOS ANGELES": "Biobío", "CORONEL": "Biobío", "HUALPEN": "Biobío", "LOTA": "Biobío", "PENCO": "Biobío", "TOME": "Biobío", "ARAUCO": "Biobío",
+        # XVI Ñuble
+        "CHILLAN": "Ñuble", "CHILLAN VIEJO": "Ñuble", "SAN CARLOS": "Ñuble", "COELECURE": "Ñuble",
+        # IX Araucanía
+        "TEMUCO": "Araucanía", "PADRE LAS CASAS": "Araucanía", "VILLARRICA": "Araucanía", "ANGOL": "Araucanía", "PUCON": "Araucanía", "VICTORIA": "Araucanía", "LAUTARO": "Araucanía",
+        # XIV Los Ríos
+        "VALDIVIA": "Los Ríos", "LA UNION": "Los Ríos", "RIO BUENO": "Los Ríos", "PANGUIPULLI": "Los Ríos",
+        # X Los Lagos
+        "PUERTO MONTT": "Los Lagos", "OSORNO": "Los Lagos", "PUERTO VARAS": "Los Lagos", "CASTRO": "Los Lagos", "ANCUD": "Los Lagos", "FRUTILLAR": "Los Lagos",
+        # XI Aysén
+        "COYHAIQUE": "Aysén", "AYSEN": "Aysén", "PUERTO AYSEN": "Aysén", "CHILE CHICO": "Aysén",
+        # XII Magallanes
+        "PUNTA ARENAS": "Magallanes", "PUERTO NATALES": "Magallanes", "PORVENIR": "Magallanes"
+    }
+
+# ==========================================
 # CARGA DE DATOS
 # ==========================================
 @st.cache_data
 def load_data():
-    """Carga los datos originales, formatea fechas y limpia numéricos."""
+    """Carga los datos originales, formatea fechas y agrega regiones."""
     script_dir = os.path.abspath(os.path.dirname(__file__))
-    # Intenta cargar desde carpeta data (estructura repo) o raíz
     data_path_folder = os.path.join(script_dir, "data", "rawdata_20240409.csv")
     data_path_root = "rawdata_20240409 (1).csv" 
     
@@ -45,19 +89,25 @@ def load_data():
     elif os.path.exists(data_path_root):
         df = pd.read_csv(data_path_root)
     else:
-        # Intento final nombre genérico
         try:
             df = pd.read_csv("rawdata_20240409.csv")
         except:
-            st.error("⚠️ Error Crítico: No se encontró el archivo de datos 'rawdata_20240409.csv'.")
+            st.error("⚠️ Error Crítico: No se encontró el archivo de datos.")
             return pd.DataFrame()
 
-    # Conversión de fechas y numéricos
     df["DateTime"] = pd.to_datetime(df["DateTime"])
     
     if df["Valor"].dtype == object:
         df["Valor"] = df["Valor"].astype(str).str.replace(",", ".").replace("Ausencia", "0")
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce")
+    
+    # --- NUEVO: Agregar columna Región ---
+    region_map = get_comuna_region_map()
+    # Normalizar a mayúsculas para el mapeo y limpiar espacios
+    df["Comuna_Norm"] = df["Comuna"].str.upper().str.strip()
+    df["Region"] = df["Comuna_Norm"].map(region_map).fillna("Otra / No Identificada")
+    # Limpiamos la columna auxiliar
+    df = df.drop(columns=["Comuna_Norm"])
     
     return df.sort_values("DateTime")
 
@@ -89,18 +139,37 @@ LIMS = {
 
 param_disc = ["OLOR", "COLOR VERDADERO", "SABOR"]
 all_params = [p for p in df_raw["Parametro"].unique() if p not in param_disc]
-all_comunas = sorted(df_raw["Comuna"].unique())
+all_regions = sorted(df_raw["Region"].unique()) # Lista de regiones
 
 # ==========================================
-# BARRA LATERAL (Navegación y Filtros)
+# BARRA LATERAL (Navegación y Filtros Globales de Geo)
 # ==========================================
 st.sidebar.title("Water Quality Chile")
+
+# --- NUEVO: Filtro de Región en Sidebar (Afecta la lista de comunas disponibles) ---
+st.sidebar.header("📍 Ubicación Geográfica")
+# Por defecto seleccionamos todas o una específica si prefieres
+selected_regions = st.sidebar.multiselect(
+    "Filtrar por Región",
+    all_regions,
+    default=all_regions, # Por defecto todas seleccionadas para no ocultar datos
+    help="Seleccione una o más regiones para filtrar la lista de comunas."
+)
+
+# Filtramos la lista de comunas basada en la región seleccionada
+if selected_regions:
+    comunas_filtered = sorted(df_raw[df_raw["Region"].isin(selected_regions)]["Comuna"].unique())
+else:
+    comunas_filtered = sorted(df_raw["Comuna"].unique())
+
+st.sidebar.markdown("---")
+
 modo_visualizacion = st.sidebar.radio(
     "Seleccione análisis:",
     options=[
         "Análisis Temporal", 
         "Radar de Riesgos (Comparativo)",
-        "Clustering IA (Perfiles de Agua)"  # Opción nueva
+        "Clustering IA (Perfiles de Agua)"
     ],
     index=0
 )
@@ -112,9 +181,8 @@ st.sidebar.markdown("---")
 # ==========================================
 if modo_visualizacion == "Análisis Temporal":
     
-    st.sidebar.subheader("🛠️ Filtros")
+    st.sidebar.subheader("🛠️ Filtros de Análisis")
     
-    # Defaults
     default_param_name = "SOLIDOS DISUELTOS TOTALES"
     try:
         default_param_index = all_params.index(default_param_name)
@@ -123,12 +191,19 @@ if modo_visualizacion == "Análisis Temporal":
 
     selected_param = st.sidebar.selectbox("Parámetro", all_params, index=default_param_index)
     
-    default_comunas = ["COPIAPO"]
-    default_comunas = [c for c in default_comunas if c in all_comunas]
-    if not default_comunas and all_comunas:
-        default_comunas = [all_comunas[0]]
+    # Lógica de defaults para comunas (debe estar dentro de las filtradas por región)
+    default_target = "COPIAPO"
+    default_selection = []
+    if default_target in comunas_filtered:
+        default_selection = [default_target]
+    elif comunas_filtered:
+        default_selection = [comunas_filtered[0]]
 
-    selected_comunas = st.sidebar.multiselect("Comunas", all_comunas, default=default_comunas)
+    selected_comunas = st.sidebar.multiselect(
+        "Comunas", 
+        comunas_filtered, 
+        default=default_selection
+    )
     
     min_date = df_raw["DateTime"].min()
     max_date = df_raw["DateTime"].max()
@@ -140,7 +215,13 @@ if modo_visualizacion == "Análisis Temporal":
     )
 
     st.title("Dashboard Calidad de agua potable Chile")
-    st.markdown(f"**Parámetro analizado:** {selected_param}")
+    
+    # Mostrar región en subtítulo si hay 1 comuna seleccionada
+    if len(selected_comunas) == 1:
+        reg = df_raw[df_raw["Comuna"] == selected_comunas[0]]["Region"].iloc[0]
+        st.markdown(f"**Comuna:** {selected_comunas[0]} ({reg}) | **Parámetro:** {selected_param}")
+    else:
+        st.markdown(f"**Parámetro analizado:** {selected_param}")
     
     if not selected_comunas:
         st.warning("Seleccione al menos una comuna en la barra lateral.")
@@ -156,11 +237,13 @@ if modo_visualizacion == "Análisis Temporal":
         if df_filtered.empty:
             st.info("No hay datos disponibles para esta selección.")
         else:
-            # 1. Gráfico Principal
+            # 1. Gráfico
             fig_line = px.line(
                 df_filtered, x="DateTime", y="Valor", color="Comuna", 
                 markers=True, title=f"Serie Temporal - {selected_param}",
-                labels={"Valor": f"Valor ({df_filtered['Unidad'].iloc[0]})"}
+                labels={"Valor": f"Valor ({df_filtered['Unidad'].iloc[0]})"},
+                # Agregamos Región al hover
+                hover_data={"Region": True}
             )
             
             if selected_param in LIMS:
@@ -172,7 +255,7 @@ if modo_visualizacion == "Análisis Temporal":
 
             st.plotly_chart(fig_line, use_container_width=True)
             
-            # 2. Métricas y KPIs
+            # 2. KPIs
             st.subheader("📊 Estado Actual (Último Registro)")
             cols_kpi = st.columns(len(selected_comunas))
             
@@ -199,17 +282,13 @@ if modo_visualizacion == "Análisis Temporal":
                             help=f"Fecha medición: {last_date_str}"
                         )
 
-            # 3. Histograma y Estadísticas
+            # 3. Histograma y Stats
             col1, col2 = st.columns([1, 1])
             with col1:
                 st.subheader("Histograma")
                 fig_hist = px.histogram(
-                    df_filtered, 
-                    x="Valor", 
-                    color="Comuna", 
-                    barmode="overlay",
-                    title="Histograma",
-                    opacity=0.7
+                    df_filtered, x="Valor", color="Comuna", barmode="overlay",
+                    title="Histograma", opacity=0.7
                 )
                 st.plotly_chart(fig_hist, use_container_width=True)
                 
@@ -217,21 +296,21 @@ if modo_visualizacion == "Análisis Temporal":
                 st.subheader("Resumen Estadístico")
                 stats = df_filtered.groupby("Comuna")["Valor"].describe()[['count', 'mean', 'max', 'min', 'std']]
                 last_dates = df_filtered.groupby("Comuna")["DateTime"].max().dt.strftime('%m-%Y')
+                # Agregamos región a la tabla resumen
+                regions_summary = df_filtered.groupby("Comuna")["Region"].first()
+                
+                stats["Región"] = regions_summary
                 stats["Último Dato"] = last_dates
+                
                 st.dataframe(
                     stats.style.format("{:.1f}", subset=['mean', 'max', 'min', 'std']), 
                     use_container_width=True
                 )
                 
             st.subheader("Exportar Datos")
-            st.write("Descargue los datos filtrados para su propio análisis.")
             csv = df_filtered.to_csv(index=False).encode('utf-8')
             st.download_button(
-                "📥 Descargar CSV Filtrado",
-                data=csv,
-                file_name=f"datos_{selected_param}.csv",
-                mime="text/csv",
-                key='download-csv'
+                "📥 Descargar CSV Filtrado", data=csv, file_name=f"datos_{selected_param}.csv", mime="text/csv"
             )
 
 # ==========================================
@@ -240,35 +319,33 @@ if modo_visualizacion == "Análisis Temporal":
 elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
     
     st.sidebar.subheader("⚙️ Configuración Radar")
-    st.sidebar.info(
-        "Muestra el **máximo histórico del último año móvil** (últimos 365 días de datos) "
-        "normalizado respecto a la norma. Valor > 1.0 indica fuera de norma."
-    )
+    st.sidebar.info("Comparación multidimensional normalizada (Valor / Límite).")
     
+    # Defaults considerando el filtro de regiones
     default_radar_comunas = ["COPIAPO", "VALPARAISO"]
-    default_radar_comunas = [c for c in default_radar_comunas if c in all_comunas]
+    # Solo mantener los defaults si están en la lista filtrada actual
+    default_radar_comunas = [c for c in default_radar_comunas if c in comunas_filtered]
     
+    # Si los defaults no están disponibles (ej: filtraste solo Región Metropolitana), tomar los primeros disponibles
+    if len(default_radar_comunas) < 2 and len(comunas_filtered) >= 2:
+        default_radar_comunas = comunas_filtered[:2]
+
     radar_comunas = st.sidebar.multiselect(
-        "Comunas a comparar", all_comunas, 
-        default=default_radar_comunas if default_radar_comunas else all_comunas[:2]
+        "Comunas a comparar", comunas_filtered, 
+        default=default_radar_comunas
     )
     
     params_avail = [p for p in all_params if p in LIMS]
     
     default_radar_params = []
     excluded_params = ["COLIFORMES TOTALES", "TURBIEDAD"]
-    
     for p in params_avail:
-        if p in excluded_params:
-            continue
-        default_radar_params.append(p)
-    
+        if p not in excluded_params:
+            default_radar_params.append(p)
     if "SOLIDOS DISUELTOS TOTALES" in params_avail and "SOLIDOS DISUELTOS TOTALES" not in default_radar_params:
         default_radar_params.append("SOLIDOS DISUELTOS TOTALES")
 
-    radar_params = st.sidebar.multiselect(
-        "Parámetros", params_avail, default=default_radar_params
-    )
+    radar_params = st.sidebar.multiselect("Parámetros", params_avail, default=default_radar_params)
 
     st.title("🕸️ Radar multipárametro")
     
@@ -285,6 +362,9 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
             
             df_comuna = df_raw[df_raw["Comuna"] == comuna]
             if df_comuna.empty: continue
+            
+            # Obtener región para mostrar en tabla
+            region_name = df_comuna["Region"].iloc[0]
                 
             last_date = df_comuna["DateTime"].max()
             start_date = last_date - timedelta(days=365)
@@ -306,6 +386,7 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
                     
                     summary_data.append({
                         "Comuna": comuna,
+                        "Región": region_name,
                         "Parámetro": param,
                         "Max Valor (Año)": max_val,
                         "Límite Ref": ref_val,
@@ -339,21 +420,18 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
                     current_max = max(trace.r)
                     if current_max > max_val_found:
                         max_val_found = current_max
-            
             upper_range = max(2.0, max_val_found * 1.1)
 
             fig_radar.update_layout(
                 polar=dict(radialaxis=dict(visible=True, range=[0, upper_range])),
                 height=600, showlegend=True
             )
-            
             st.plotly_chart(fig_radar, use_container_width=True)
             
             st.subheader("Detalle de valores críticos")
             df_summary = pd.DataFrame(summary_data)
             if not df_summary.empty:
                 df_summary = df_summary.sort_values("Indice Riesgo", ascending=False)
-                
                 def highlight_risk(val):
                     color = 'red' if val > 1.0 else 'orange' if val > 0.8 else 'green'
                     return f'color: {color}; font-weight: bold'
@@ -364,150 +442,99 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
                     use_container_width=True, hide_index=True
                 )
         else:
-            st.info("No hay datos suficientes en el último año móvil para generar el radar.")
+            st.info("No hay datos suficientes en el último año móvil.")
 
 # ==========================================
-# VISTA 3: CLUSTERING IA (NUEVO)
+# VISTA 3: CLUSTERING IA
 # ==========================================
 elif modo_visualizacion == "Clustering IA (Perfiles de Agua)":
     st.title("🤖 Clustering de Perfiles de Agua (IA)")
     st.markdown("""
-    Esta sección utiliza algoritmos de **Machine Learning (K-Means + PCA)** para agrupar comunas automáticamente según la composición química de su agua.
-    
-    * **¿Qué hace?** Analiza múltiples parámetros simultáneamente y detecta patrones ocultos.
-    * **¿Para qué sirve?** Para identificar grupos de comunas con problemas similares (ej: "Cluster de agua dura", "Cluster de contaminación por sulfatos") sin revisión manual.
+    Agrupación automática de comunas según huella química (K-Means).
+    **Nota:** El modelo usará solo las comunas de las regiones seleccionadas en la barra lateral.
     """)
 
-    # 1. Configuración Sidebar
     st.sidebar.subheader("⚙️ Configuración del Modelo")
     n_clusters = st.sidebar.slider("Número de Grupos (Clusters)", 2, 6, 3)
     
-    # 2. Data Engineering (Pipeline)
-    # Filtrar últimos 2 años para tener datos recientes pero suficientes para imputar
+    # Filtrar data por tiempo Y por región seleccionada
     last_date = df_raw["DateTime"].max()
     start_date = last_date - timedelta(days=365*2)
-    df_recent = df_raw[df_raw["DateTime"] >= start_date].copy()
+    
+    # Aplicar filtro de regiones (usamos comunas_filtered que ya viene filtrado arriba)
+    df_recent = df_raw[
+        (df_raw["DateTime"] >= start_date) & 
+        (df_raw["Comuna"].isin(comunas_filtered))
+    ].copy()
     
     if df_recent.empty:
-        st.error("No hay suficientes datos recientes (últimos 2 años) para generar clusters.")
+        st.error("No hay suficientes datos recientes en las regiones seleccionadas.")
     else:
-        # Pivotar: Comunas x Parámetros (Matriz de Características)
-        # Filtramos parámetros discretos que no sirven para K-Means
         df_numeric = df_recent[~df_recent["Parametro"].isin(param_disc)]
+        df_pivot = df_numeric.pivot_table(index="Comuna", columns="Parametro", values="Valor", aggfunc="mean")
         
-        # Agregamos por media (perfil promedio de la comuna en el periodo)
-        df_pivot = df_numeric.pivot_table(
-            index="Comuna", 
-            columns="Parametro", 
-            values="Valor", 
-            aggfunc="mean"
-        )
-        
-        # Limpieza de datos (Imputación Inteligente)
-        # 1. Eliminar columnas (parámetros) con demasiados nulos (>30%)
-        #    Si un parámetro casi nadie lo mide, ensucia el modelo.
         limit_nan = len(df_pivot) * 0.3
         df_pivot = df_pivot.dropna(thresh=len(df_pivot) - limit_nan, axis=1)
-        
-        # 2. Rellenar vacíos restantes con la mediana de la columna
-        #    La mediana es robusta a outliers extremos
         df_pivot_filled = df_pivot.fillna(df_pivot.median())
-        
-        # 3. Eliminar comunas que sigan teniendo NaNs (si una columna era 100% NaN para un grupo)
         df_pivot_final = df_pivot_filled.dropna()
         
         if df_pivot_final.shape[0] < n_clusters:
-            st.warning(f"No hay suficientes comunas ({len(df_pivot_final)}) con datos completos para formar {n_clusters} clusters.")
+            st.warning(f"No hay suficientes comunas ({len(df_pivot_final)}) para formar {n_clusters} clusters. Intenta seleccionar más regiones.")
         else:
-            # 3. Machine Learning Pipeline
-            # A. Escalamiento (StandardScaler): Crucial porque Sulfatos (200 mg/L) > Arsénico (0.01 mg/L)
             scaler = StandardScaler()
             X_scaled = scaler.fit_transform(df_pivot_final)
             
-            # B. Reducción de Dimensionalidad (PCA) para visualización 2D
             pca = PCA(n_components=2)
             components = pca.fit_transform(X_scaled)
             
-            # C. Clustering (K-Means)
             kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
             clusters = kmeans.fit_predict(X_scaled)
             
-            # 4. Preparar DataFrame de Resultados
             df_results = df_pivot_final.copy()
             df_results["Cluster"] = clusters.astype(str)
             df_results["PC1"] = components[:, 0]
             df_results["PC2"] = components[:, 1]
             
-            # 5. Visualización 1: Mapa de Clusters (Scatter 2D)
+            # Unir info de región para el tooltip
+            region_map_info = df_raw.groupby("Comuna")["Region"].first()
+            df_results["Region"] = df_results.index.map(region_map_info)
+
             st.subheader("Mapa de Similitud (PCA)")
-            st.info("💡 Cada punto es una comuna. La distancia representa qué tan químicamente similar es su agua.")
-            
             fig_pca = px.scatter(
                 df_results.reset_index(),
-                x="PC1", 
-                y="PC2", 
-                color="Cluster",
+                x="PC1", y="PC2", color="Cluster",
                 hover_name="Comuna",
-                # Mostrar los primeros 5 parámetros en el tooltip para contexto
-                hover_data={col: ":.2f" for col in df_pivot_final.columns[:5]}, 
+                hover_data={"Region": True},
                 title=f"Agrupación de Comunas (K={n_clusters})",
                 color_discrete_sequence=px.colors.qualitative.Bold
             )
             st.plotly_chart(fig_pca, use_container_width=True)
             
-            # 6. Interpretación: Radar de Centroides (Relativo al Promedio)
-            st.subheader("Interpretación de los Grupos")
-            st.markdown("""
-            **¿Qué caracteriza a cada Cluster?**
-            El gráfico muestra cuánto se desvía el promedio de cada grupo respecto al **promedio nacional**.
-            - **Valor > 0%**: El grupo tiene *más* concentración que el promedio.
-            - **Valor < 0%**: El grupo tiene *menos* concentración que el promedio.
-            """)
-            
-            # Calcular promedios por cluster
-            cluster_means = df_results.drop(["PC1", "PC2"], axis=1).groupby("Cluster").mean()
+            # Radar de Clusters
+            st.subheader("Interpretación de los Grupos (Perfil Relativo)")
+            cluster_means = df_results.drop(["PC1", "PC2", "Region"], axis=1).groupby("Cluster").mean()
             global_mean = df_pivot_final.mean()
-            
-            # Calcular desviación porcentual relativa ((Cluster / Global) - 1)
-            # Ejemplo: Si Global=100 y Cluster=150 -> (1.5 - 1) = 0.5 (+50%)
             relative_means = (cluster_means / global_mean) - 1
             
-            # Seleccionar Top 10 variables con mayor varianza para simplificar el gráfico
             variances = df_pivot_final.var().sort_values(ascending=False)
             top_vars = variances.index[:10].tolist() 
             
             fig_radar_clusters = go.Figure()
-            
             for cluster_id in sorted(df_results["Cluster"].unique()):
                 values = relative_means.loc[cluster_id, top_vars]
-                
                 fig_radar_clusters.add_trace(go.Scatterpolar(
-                    r=values,
-                    theta=top_vars,
-                    fill='toself',
-                    name=f"Cluster {cluster_id}"
+                    r=values, theta=top_vars, fill='toself', name=f"Cluster {cluster_id}"
                 ))
-            
-            # Línea de referencia (Promedio Nacional = 0)
             fig_radar_clusters.add_trace(go.Scatterpolar(
-                r=[0]*len(top_vars),
-                theta=top_vars,
-                mode='lines',
-                line=dict(color='black', dash='dash'),
-                name='Promedio Nacional'
+                r=[0]*len(top_vars), theta=top_vars, mode='lines',
+                line=dict(color='black', dash='dash'), name='Promedio Nacional'
             ))
-
             fig_radar_clusters.update_layout(
-                polar=dict(
-                    radialaxis=dict(visible=True, showticklabels=True, tickformat=".0%")
-                ),
-                title="Perfil Químico Relativo (Top 10 parámetros más variables)",
-                height=600
+                polar=dict(radialaxis=dict(visible=True, tickformat=".0%")),
+                title="Perfil Químico Relativo", height=600
             )
-            
             st.plotly_chart(fig_radar_clusters, use_container_width=True)
             
-            # 7. Listado de Comunas
             st.subheader("Listado de Comunas por Cluster")
             cols = st.columns(n_clusters)
             for i, col in enumerate(cols):
@@ -516,22 +543,20 @@ elif modo_visualizacion == "Clustering IA (Perfiles de Agua)":
                     comunas_in_cluster = df_results[df_results["Cluster"] == cluster_id].index.tolist()
                     with col:
                         st.success(f"**Cluster {cluster_id}** ({len(comunas_in_cluster)} comunas)")
-                        st.markdown("\n".join([f"- {c}" for c in comunas_in_cluster[:15]]))
+                        for c in comunas_in_cluster[:15]:
+                            # Mostrar región junto al nombre
+                            reg = df_results.loc[c, "Region"]
+                            st.write(f"- {c} <span style='color:gray;font-size:0.8em'>({reg})</span>", unsafe_allow_html=True)
                         if len(comunas_in_cluster) > 15:
                             st.caption(f"... y {len(comunas_in_cluster)-15} más")
 
 # ==========================================
-# FOOTER / ACERCA DE
+# FOOTER
 # ==========================================
 st.sidebar.markdown("---")
 with st.sidebar.expander("ℹ️ Acerca de"):
     st.markdown("""
     **Monitor de Calidad de Agua**
-    
-    Esta herramienta visualiza datos públicos de calidad del agua.
-    
-    - **Código Fuente:** [GitHub: chile-waterquality](https://github.com/luchoplaza/chile-waterquality)
-    - **Datos:** Extraídos de reportes SISS.
-    - **Desarrollador:** Lucho Plaza.
+    v1.7 - Geo Edition
+    [GitHub: chile-waterquality](https://github.com/luchoplaza/chile-waterquality)
     """)
-    st.caption("v1.6 - ML Edition")
