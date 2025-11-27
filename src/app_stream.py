@@ -81,19 +81,33 @@ def get_comuna_region_map():
 def load_data():
     """Carga los datos originales, formatea fechas y agrega regiones."""
     script_dir = os.path.abspath(os.path.dirname(__file__))
-    data_path_folder = os.path.join(script_dir, "data", "rawdata_20240409.csv")
-    data_path_root = "rawdata_20240409 (1).csv" 
     
-    if os.path.exists(data_path_folder):
-        df = pd.read_csv(data_path_folder)
-    elif os.path.exists(data_path_root):
-        df = pd.read_csv(data_path_root)
-    else:
-        try:
-            df = pd.read_csv("rawdata_20240409.csv")
-        except:
-            st.error("⚠️ Error Crítico: No se encontró el archivo de datos.")
-            return pd.DataFrame()
+    # Lista de rutas posibles ordenadas por prioridad
+    possible_paths = [
+        os.path.join(script_dir, "data", "rawdata_20240409.csv"),
+        "rawdata_20240409 (1).csv",
+        "rawdata_20240409.csv"
+    ]
+    
+    df = None
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                # Intentar leer el archivo
+                temp_df = pd.read_csv(path)
+                # Verificar que no esté vacío
+                if not temp_df.empty:
+                    df = temp_df
+                    break # Éxito, salimos del ciclo
+            except pd.errors.EmptyDataError:
+                continue # El archivo existe pero está vacío, probamos el siguiente
+            except Exception:
+                continue # Otro error, probamos el siguiente
+    
+    if df is None:
+        st.error("⚠️ Error Crítico: No se encontró ningún archivo de datos válido (CSV no vacío).")
+        return pd.DataFrame()
 
     df["DateTime"] = pd.to_datetime(df["DateTime"])
     
