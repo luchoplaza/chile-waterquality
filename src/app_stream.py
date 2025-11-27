@@ -81,32 +81,43 @@ def load_data():
     """Carga los datos originales, formatea fechas y agrega regiones. Maneja errores de archivo vacío."""
     script_dir = os.path.abspath(os.path.dirname(__file__))
     
-    # Lista de rutas posibles ordenadas por prioridad
+    # Definir posibles rutas donde podría estar el archivo CSV
+    # Prioridad: carpeta data local > directorio padre > raíz > nombres alternativos
     possible_paths = [
         os.path.join(script_dir, "data", "rawdata_20240409.csv"),
-        "rawdata_20240409 (1).csv",
-        "rawdata_20240409.csv"
+        os.path.join(script_dir, "..", "rawdata_20240409.csv"), # Intento en directorio padre (root)
+        "rawdata_20240409.csv",
+        "rawdata_20240409 (1).csv"
     ]
     
     df = None
     
     for path in possible_paths:
+        # 1. Verificar si el archivo existe
         if os.path.exists(path):
+            # 2. Verificar si el archivo tiene contenido (evita EmptyDataError)
             try:
-                # Intentar leer el archivo
+                if os.stat(path).st_size == 0:
+                    continue # Archivo existe pero está vacío (0 bytes), saltar
+            except OSError:
+                continue
+
+            # 3. Intentar leer el archivo con Pandas
+            try:
                 temp_df = pd.read_csv(path)
-                # Verificar que no esté vacío
+                
+                # 4. Verificar que el DataFrame resultante tenga datos
                 if not temp_df.empty:
                     df = temp_df
-                    break # Éxito, salimos del ciclo
-            except pd.errors.EmptyDataError:
-                continue # El archivo existe pero está vacío, probamos el siguiente
+                    break # ¡Éxito! Salimos del ciclo
             except Exception:
-                continue # Otro error, probamos el siguiente
+                # Si falla la lectura (formato inválido, etc.), seguimos buscando
+                continue
     
     if df is None:
+        # Fallback: Crear DataFrame vacío con columnas esperadas para evitar crash total de la app
         st.error("⚠️ Error Crítico: No se encontró ningún archivo de datos válido (CSV no vacío).")
-        return pd.DataFrame()
+        return pd.DataFrame(columns=["DateTime", "Comuna", "Parametro", "Valor", "Unidad", "Empresa", "Region"])
 
     df["DateTime"] = pd.to_datetime(df["DateTime"])
     
@@ -124,7 +135,9 @@ def load_data():
 
 df_raw = load_data()
 
+# Si el df está vacío (fallback activado), detenemos la ejecución amigablemente
 if df_raw.empty:
+    st.warning("Esperando datos... Por favor verifica que el archivo CSV esté cargado correctamente.")
     st.stop()
 
 # ==========================================
