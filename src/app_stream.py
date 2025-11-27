@@ -291,10 +291,24 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
                 name='Límite (100%)', hoverinfo='skip'
             ))
 
+            # --- CORRECCIÓN APLICADA AQUÍ ---
+            # Calcular rango dinámico de manera segura
+            max_val_found = 0
+            for trace in fig_radar.data:
+                # trace.r devuelve una tupla/lista de valores
+                if hasattr(trace, 'r') and trace.r:
+                    current_max = max(trace.r) # Maximo de la lista de esta traza
+                    if current_max > max_val_found:
+                        max_val_found = current_max
+            
+            upper_range = max(2.0, max_val_found * 1.1)
+
             fig_radar.update_layout(
-                polar=dict(radialaxis=dict(visible=True, range=[0, max(2.0, max([t.r for t in fig_radar.data if hasattr(t, 'r') and t.r])*1.1)])),
+                polar=dict(radialaxis=dict(visible=True, range=[0, upper_range])),
                 height=600, showlegend=True
             )
+            # --------------------------------
+            
             st.plotly_chart(fig_radar, use_container_width=True)
             
             # Tabla de detalles debajo del radar
