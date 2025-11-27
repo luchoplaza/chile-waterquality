@@ -6,7 +6,6 @@ import streamlit as st
 from datetime import timedelta
 
 # Librerías de Machine Learning
-# Se envuelven en try/except para manejar entornos donde no estén instaladas
 try:
     from sklearn.preprocessing import StandardScaler
     from sklearn.decomposition import PCA
@@ -24,7 +23,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS personalizados para métricas y tablas
+# Estilos CSS personalizados
 st.markdown("""
 <style>
     [data-testid="stMetricValue"] {
@@ -78,14 +77,12 @@ def get_comuna_region_map():
 # ==========================================
 @st.cache_data
 def load_data():
-    """Carga los datos originales, formatea fechas y agrega regiones. Maneja errores de archivo vacío."""
+    """Carga los datos originales, formatea fechas y agrega regiones."""
     script_dir = os.path.abspath(os.path.dirname(__file__))
     
-    # Definir posibles rutas donde podría estar el archivo CSV
-    # Prioridad: carpeta data local > directorio padre > raíz > nombres alternativos
     possible_paths = [
         os.path.join(script_dir, "data", "rawdata_20240409.csv"),
-        os.path.join(script_dir, "..", "rawdata_20240409.csv"), # Intento en directorio padre (root)
+        os.path.join(script_dir, "..", "rawdata_20240409.csv"), 
         "rawdata_20240409.csv",
         "rawdata_20240409 (1).csv"
     ]
@@ -93,29 +90,22 @@ def load_data():
     df = None
     
     for path in possible_paths:
-        # 1. Verificar si el archivo existe
         if os.path.exists(path):
-            # 2. Verificar si el archivo tiene contenido (evita EmptyDataError)
             try:
                 if os.stat(path).st_size == 0:
-                    continue # Archivo existe pero está vacío (0 bytes), saltar
+                    continue 
             except OSError:
                 continue
 
-            # 3. Intentar leer el archivo con Pandas
             try:
                 temp_df = pd.read_csv(path)
-                
-                # 4. Verificar que el DataFrame resultante tenga datos
                 if not temp_df.empty:
                     df = temp_df
-                    break # ¡Éxito! Salimos del ciclo
+                    break 
             except Exception:
-                # Si falla la lectura (formato inválido, etc.), seguimos buscando
                 continue
     
     if df is None:
-        # Fallback: Crear DataFrame vacío con columnas esperadas para evitar crash total de la app
         st.error("⚠️ Error Crítico: No se encontró ningún archivo de datos válido (CSV no vacío).")
         return pd.DataFrame(columns=["DateTime", "Comuna", "Parametro", "Valor", "Unidad", "Empresa", "Region"])
 
@@ -125,7 +115,6 @@ def load_data():
         df["Valor"] = df["Valor"].astype(str).str.replace(",", ".").replace("Ausencia", "0")
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce")
     
-    # --- Mapeo de Regiones ---
     region_map = get_comuna_region_map()
     df["Comuna_Norm"] = df["Comuna"].str.upper().str.strip()
     df["Region"] = df["Comuna_Norm"].map(region_map).fillna("Otra / No Identificada")
@@ -135,7 +124,6 @@ def load_data():
 
 df_raw = load_data()
 
-# Si el df está vacío (fallback activado), detenemos la ejecución amigablemente
 if df_raw.empty:
     st.warning("Esperando datos... Por favor verifica que el archivo CSV esté cargado correctamente.")
     st.stop()
@@ -166,38 +154,38 @@ all_params = [p for p in df_raw["Parametro"].unique() if p not in param_disc]
 all_regions = sorted(df_raw["Region"].unique())
 
 # ==========================================
-# BARRA LATERAL
+# BARRA LATERAL (Navegación)
 # ==========================================
 st.sidebar.title("Water Quality Chile")
 
-# --- Filtro de Región ---
-st.sidebar.header("📍 Ubicación Geográfica")
-selected_regions = st.sidebar.multiselect(
-    "Filtrar por Región",
-    all_regions,
-    default=all_regions,
-    help="Seleccione una o más regiones para filtrar la lista de comunas."
-)
-
-# Filtramos la lista de comunas globalmente según región
-if selected_regions:
-    comunas_filtered = sorted(df_raw[df_raw["Region"].isin(selected_regions)]["Comuna"].unique())
-else:
-    comunas_filtered = sorted(df_raw["Comuna"].unique())
-
-st.sidebar.markdown("---")
-
+# Selector de Modo (Ahora al principio)
 modo_visualizacion = st.sidebar.radio(
     "Seleccione análisis:",
     options=[
         "Análisis Temporal", 
-        "Radar de Riesgos (Comparativo)",
-        "Clustering IA (Perfiles de Agua)"
+        "Radar multipárametro", 
+        "Perfiles de agua (KM+PCA)"
     ],
     index=0
 )
 
 st.sidebar.markdown("---")
+
+# Función auxiliar para renderizar filtro de región de manera consistente
+def render_region_filter():
+    st.sidebar.markdown("**Ubicación Geográfica**")
+    selected = st.sidebar.multiselect(
+        "Filtrar por Región",
+        all_regions,
+        default=[], # Por defecto vacío (no filtra nada)
+        help="Dejar vacío para ver todas las regiones.",
+        key="region_filter_global" # Misma key para mantener estado entre pestañas si se desea
+    )
+    # Lógica: Si está vacío, devuelve TODAS las comunas. Si tiene selección, filtra.
+    if selected:
+        return sorted(df_raw[df_raw["Region"].isin(selected)]["Comuna"].unique())
+    else:
+        return sorted(df_raw["Comuna"].unique())
 
 # ==========================================
 # VISTA 1: ANÁLISIS TEMPORAL
@@ -206,15 +194,18 @@ if modo_visualizacion == "Análisis Temporal":
     
     st.sidebar.subheader("🛠️ Filtros de Análisis")
     
+    # 1. Filtro Región (Ubicado bajo Filtros de Análisis)
+    comunas_filtered = render_region_filter()
+    
+    # 2. Filtro Parámetro
     default_param_name = "SOLIDOS DISUELTOS TOTALES"
     try:
         default_param_index = all_params.index(default_param_name)
     except ValueError:
         default_param_index = 0
-
     selected_param = st.sidebar.selectbox("Parámetro", all_params, index=default_param_index)
     
-    # Lógica de defaults
+    # 3. Filtro Comunas (Depende de región)
     default_target = "COPIAPO"
     default_selection = []
     if default_target in comunas_filtered:
@@ -228,6 +219,7 @@ if modo_visualizacion == "Análisis Temporal":
         default=default_selection
     )
     
+    # 4. Filtro Fechas
     min_date = df_raw["DateTime"].min()
     max_date = df_raw["DateTime"].max()
     date_range = st.sidebar.date_input(
@@ -334,11 +326,15 @@ if modo_visualizacion == "Análisis Temporal":
             )
 
 # ==========================================
-# VISTA 2: RADAR MULTIPARÁMETRO
+# VISTA 2: RADAR MULTIPARÁMETRO (RENOMBRADO)
 # ==========================================
-elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
+elif modo_visualizacion == "Radar multipárametro":
     
     st.sidebar.subheader("⚙️ Configuración Radar")
+    
+    # 1. Filtro Región
+    comunas_filtered = render_region_filter()
+    
     st.sidebar.info("Comparación multidimensional normalizada (Valor / Límite).")
     
     default_radar_comunas = ["COPIAPO", "VALPARAISO"]
@@ -461,23 +457,27 @@ elif modo_visualizacion == "Radar de Riesgos (Comparativo)":
             st.info("No hay datos suficientes en el último año móvil.")
 
 # ==========================================
-# VISTA 3: CLUSTERING IA (NUEVO)
+# VISTA 3: PERFILES DE AGUA (RENOMBRADO)
 # ==========================================
-elif modo_visualizacion == "Clustering IA (Perfiles de Agua)":
-    st.title("🤖 Clustering de Perfiles de Agua (IA)")
+elif modo_visualizacion == "Perfiles de agua (KM+PCA)":
+    st.title("🤖 Perfiles de agua (KM+PCA)")
     st.markdown("""
     Agrupación automática de comunas según huella química (K-Means).
-    **Nota:** El modelo usará solo las comunas de las regiones seleccionadas en la barra lateral.
+    **Nota:** El modelo usará las comunas de las regiones seleccionadas.
     """)
 
     st.sidebar.subheader("⚙️ Configuración del Modelo")
+    
+    # 1. Filtro Región
+    comunas_filtered = render_region_filter()
+    
     n_clusters = st.sidebar.slider("Número de Grupos (Clusters)", 2, 6, 3)
     
-    # Filtrar data por tiempo Y por región seleccionada
+    # Filtrar data
     last_date = df_raw["DateTime"].max()
     start_date = last_date - timedelta(days=365*2)
     
-    # Aplicar filtro de regiones (usamos comunas_filtered que ya viene filtrado arriba)
+    # Aplicar filtro de regiones (usando la lista comunas_filtered que ya fue procesada)
     df_recent = df_raw[
         (df_raw["DateTime"] >= start_date) & 
         (df_raw["Comuna"].isin(comunas_filtered))
@@ -529,35 +529,66 @@ elif modo_visualizacion == "Clustering IA (Perfiles de Agua)":
                 color_discrete_sequence=px.colors.qualitative.Bold
             )
             
-            # Aumentar tamaño de puntos y borde para mejor visibilidad
             fig_pca.update_traces(marker=dict(size=12, line=dict(width=1, color='DarkSlateGrey')))
-            
             st.plotly_chart(fig_pca, use_container_width=True)
             
-            # Radar de Clusters
-            st.subheader("Interpretación de los Grupos (Perfil Relativo)")
+            # Radar de Clusters (Modificado: Respecto a Límite Real)
+            st.subheader("Interpretación de los Grupos (Riesgo Relativo)")
+            st.markdown("""
+            **Valores normalizados (Promedio del Cluster / Límite Normativo).**
+            - **1.0 (Línea punteada):** El promedio del grupo alcanza el límite permitido.
+            - **< 0.5:** Valores seguros.
+            """)
+            
+            # Calculamos promedios por cluster
             cluster_means = df_results.drop(["PC1", "PC2", "Region"], axis=1).groupby("Cluster").mean()
-            global_mean = df_pivot_final.mean()
-            relative_means = (cluster_means / global_mean) - 1
             
-            variances = df_pivot_final.var().sort_values(ascending=False)
-            top_vars = variances.index[:10].tolist() 
+            # Filtramos solo las variables que tienen Límite definido en LIMS
+            # y que además tengan cierta varianza para que el gráfico sea interesante
+            vars_with_limits = [col for col in cluster_means.columns if col in LIMS]
             
-            fig_radar_clusters = go.Figure()
-            for cluster_id in sorted(df_results["Cluster"].unique()):
-                values = relative_means.loc[cluster_id, top_vars]
+            if not vars_with_limits:
+                st.warning("No se encontraron parámetros con límites definidos para graficar el radar.")
+            else:
+                # Seleccionamos Top 10 con mayor varianza dentro de las que tienen límites
+                variances = df_pivot_final[vars_with_limits].var().sort_values(ascending=False)
+                top_vars = variances.index[:10].tolist() 
+                
+                fig_radar_clusters = go.Figure()
+                
+                for cluster_id in sorted(df_results["Cluster"].unique()):
+                    # Calcular Score = Valor Promedio / Limite Referencia
+                    scores = []
+                    for var in top_vars:
+                        val = cluster_means.loc[cluster_id, var]
+                        ref = LIMS[var]["ref"]
+                        scores.append(val / ref if ref > 0 else 0)
+                    
+                    fig_radar_clusters.add_trace(go.Scatterpolar(
+                        r=scores,
+                        theta=top_vars,
+                        fill='toself',
+                        name=f"Cluster {cluster_id}"
+                    ))
+                
+                # Línea de referencia (Límite = 1.0)
                 fig_radar_clusters.add_trace(go.Scatterpolar(
-                    r=values, theta=top_vars, fill='toself', name=f"Cluster {cluster_id}"
+                    r=[1.0]*len(top_vars),
+                    theta=top_vars,
+                    mode='lines',
+                    line=dict(color='red', dash='dash'),
+                    name='Límite Normativo (100%)'
                 ))
-            fig_radar_clusters.add_trace(go.Scatterpolar(
-                r=[0]*len(top_vars), theta=top_vars, mode='lines',
-                line=dict(color='black', dash='dash'), name='Promedio Nacional'
-            ))
-            fig_radar_clusters.update_layout(
-                polar=dict(radialaxis=dict(visible=True, tickformat=".0%")),
-                title="Perfil Químico Relativo", height=600
-            )
-            st.plotly_chart(fig_radar_clusters, use_container_width=True)
+
+                fig_radar_clusters.update_layout(
+                    polar=dict(
+                        radialaxis=dict(visible=True, tickformat=".1f") # Formato decimal
+                    ),
+                    title="Perfil de Riesgo Promedio por Cluster (Normalizado)",
+                    height=600
+                )
+                
+                st.plotly_chart(fig_radar_clusters, use_container_width=True)
             
             st.subheader("Listado de Comunas por Cluster")
             cols = st.columns(n_clusters)
@@ -580,6 +611,6 @@ st.sidebar.markdown("---")
 with st.sidebar.expander("ℹ️ Acerca de"):
     st.markdown("""
     **Monitor de Calidad de Agua**
-    v1.7 - Geo Edition
+    v1.8 - ML & UX Update
     [GitHub: chile-waterquality](https://github.com/luchoplaza/chile-waterquality)
     """)
