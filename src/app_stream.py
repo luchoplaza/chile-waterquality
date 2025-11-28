@@ -33,43 +33,167 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# DICCIONARIO DE REGIONES (MAPEO)
+# DICCIONARIO DE REGIONES (MAPEO ROBUSTO)
 # ==========================================
 def get_comuna_region_map():
-    """Retorna un diccionario para mapear Comuna -> Región."""
+    """Retorna un diccionario extendido para mapear Comuna/Localidad -> Región."""
+    # Este diccionario mapea nombres de comunas y localidades (en mayúsculas) a su Región Administrativa.
     return {
         # XV Arica y Parinacota
-        "ARICA": "Arica y Parinacota", "PUTRE": "Arica y Parinacota",
+        "ARICA": "Arica y Parinacota", "CAMARONES": "Arica y Parinacota", 
+        "PUTRE": "Arica y Parinacota", "GENERAL LAGOS": "Arica y Parinacota",
+
         # I Tarapacá
-        "IQUIQUE": "Tarapacá", "ALTO HOSPICIO": "Tarapacá", "PICA": "Tarapacá", "POZO ALMONTE": "Tarapacá",
+        "IQUIQUE": "Tarapacá", "ALTO HOSPICIO": "Tarapacá", "POZO ALMONTE": "Tarapacá", 
+        "CAMIÑA": "Tarapacá", "COLCHANE": "Tarapacá", "HUARA": "Tarapacá", "PICA": "Tarapacá",
+
         # II Antofagasta
-        "ANTOFAGASTA": "Antofagasta", "CALAMA": "Antofagasta", "TOCOPILLA": "Antofagasta", "MEJILLONES": "Antofagasta", "TALTAL": "Antofagasta", "SAN PEDRO DE ATACAMA": "Antofagasta",
+        "ANTOFAGASTA": "Antofagasta", "MEJILLONES": "Antofagasta", "SIERRA GORDA": "Antofagasta", 
+        "TALTAL": "Antofagasta", "CALAMA": "Antofagasta", "OLLAGUE": "Antofagasta", 
+        "SAN PEDRO DE ATACAMA": "Antofagasta", "TOCOPILLA": "Antofagasta", "MARIA ELENA": "Antofagasta",
+
         # III Atacama
-        "COPIAPO": "Atacama", "VALLENAR": "Atacama", "CALDERA": "Atacama", "CHAÑARAL": "Atacama", "DIEGO DE ALMAGRO": "Atacama", "HUASCO": "Atacama", "TIERRA AMARILLA": "Atacama",
+        "COPIAPO": "Atacama", "CALDERA": "Atacama", "TIERRA AMARILLA": "Atacama", 
+        "CHAÑARAL": "Atacama", "DIEGO DE ALMAGRO": "Atacama", "VALLENAR": "Atacama", 
+        "ALTO DEL CARMEN": "Atacama", "FREIRINA": "Atacama", "HUASCO": "Atacama",
+
         # IV Coquimbo
-        "LA SERENA": "Coquimbo", "COQUIMBO": "Coquimbo", "OVALLE": "Coquimbo", "ILLAPEL": "Coquimbo", "VICUÑA": "Coquimbo", "SALAMANCA": "Coquimbo", "LOS VILOS": "Coquimbo", "ANDACOLLO": "Coquimbo",
+        "LA SERENA": "Coquimbo", "COQUIMBO": "Coquimbo", "ANDACOLLO": "Coquimbo", 
+        "LA HIGUERA": "Coquimbo", "PAIGUANO": "Coquimbo", "VICUÑA": "Coquimbo", 
+        "ILLAPEL": "Coquimbo", "CANELA": "Coquimbo", "LOS VILOS": "Coquimbo", 
+        "SALAMANCA": "Coquimbo", "OVALLE": "Coquimbo", "COMBARBALA": "Coquimbo", 
+        "MONTE PATRIA": "Coquimbo", "PUNITAQUI": "Coquimbo", "RIO HURTADO": "Coquimbo",
+
         # V Valparaíso
-        "VALPARAISO": "Valparaíso", "VIÑA DEL MAR": "Valparaíso", "QUILPUE": "Valparaíso", "VILLA ALEMANA": "Valparaíso", "SAN ANTONIO": "Valparaíso", "QUILLOTA": "Valparaíso", "LOS ANDES": "Valparaíso", "SAN FELIPE": "Valparaíso", "LA LIGUA": "Valparaíso", "LIMACHE": "Valparaíso", "CONCON": "Valparaíso", "QUINTERO": "Valparaíso", "PUCHUNCAVI": "Valparaíso", "CASABLANCA": "Valparaíso",
-        # RM Metropolitana
-        "SANTIAGO": "Metropolitana", "PUENTE ALTO": "Metropolitana", "MAIPU": "Metropolitana", "LA FLORIDA": "Metropolitana", "LAS CONDES": "Metropolitana", "SAN BERNARDO": "Metropolitana", "PEÑALOLEN": "Metropolitana", "QUILICURA": "Metropolitana", "SANTIAGO CENTRO": "Metropolitana", "PROVIDENCIA": "Metropolitana", "ÑUÑOA": "Metropolitana", "COLINA": "Metropolitana", "LAMPA": "Metropolitana", "TIL TIL": "Metropolitana", "BUIN": "Metropolitana", "PAINE": "Metropolitana", "TALAGANTE": "Metropolitana", "MELIPILLA": "Metropolitana", "CURACAVI": "Metropolitana", "HACIENDA BATUCO": "Metropolitana", "REINA NORTE": "Metropolitana", "EL COLORADO": "Metropolitana", "LA PARVA": "Metropolitana", "VALLE NEVADO": "Metropolitana",
+        "VALPARAISO": "Valparaíso", "CASABLANCA": "Valparaíso", "CONCON": "Valparaíso", 
+        "JUAN FERNANDEZ": "Valparaíso", "PUCHUNCAVI": "Valparaíso", "QUINTERO": "Valparaíso", 
+        "VIÑA DEL MAR": "Valparaíso", "ISLA DE PASCUA": "Valparaíso", "LOS ANDES": "Valparaíso", 
+        "CALLE LARGA": "Valparaíso", "RINCONADA": "Valparaíso", "SAN ESTEBAN": "Valparaíso", 
+        "LA LIGUA": "Valparaíso", "CABILDO": "Valparaíso", "PAPUDO": "Valparaíso", 
+        "PETORCA": "Valparaíso", "ZAPALLAR": "Valparaíso", "QUILLOTA": "Valparaíso", 
+        "CALERA": "Valparaíso", "HIJUELAS": "Valparaíso", "LA CRUZ": "Valparaíso", 
+        "NOGALES": "Valparaíso", "SAN ANTONIO": "Valparaíso", "ALGARROBO": "Valparaíso", 
+        "CARTAGENA": "Valparaíso", "EL QUISCO": "Valparaíso", "EL TABO": "Valparaíso", 
+        "SANTO DOMINGO": "Valparaíso", "SAN FELIPE": "Valparaíso", "CATEMU": "Valparaíso", 
+        "LLAILLAY": "Valparaíso", "PANQUEHUE": "Valparaíso", "PUTAENDO": "Valparaíso", 
+        "SANTA MARIA": "Valparaíso", "QUILPUE": "Valparaíso", "LIMACHE": "Valparaíso", 
+        "OLMUE": "Valparaíso", "VILLA ALEMANA": "Valparaíso",
+
+        # RM Metropolitana (Incluyendo localidades específicas del dataset)
+        "SANTIAGO": "Metropolitana", "CERRILLOS": "Metropolitana", "CERRO NAVIA": "Metropolitana", 
+        "CONCHALI": "Metropolitana", "EL BOSQUE": "Metropolitana", "ESTACION CENTRAL": "Metropolitana", 
+        "HUECHURABA": "Metropolitana", "INDEPENDENCIA": "Metropolitana", "LA CISTERNA": "Metropolitana", 
+        "LA FLORIDA": "Metropolitana", "LA GRANJA": "Metropolitana", "LA PINTANA": "Metropolitana", 
+        "LA REINA": "Metropolitana", "LAS CONDES": "Metropolitana", "LO BARNECHEA": "Metropolitana", 
+        "LO ESPEJO": "Metropolitana", "LO PRADO": "Metropolitana", "MACUL": "Metropolitana", 
+        "MAIPU": "Metropolitana", "NUNOA": "Metropolitana", "ÑUÑOA": "Metropolitana", 
+        "PEDRO AGUIRRE CERDA": "Metropolitana", "PENALOLEN": "Metropolitana", "PEÑALOLEN": "Metropolitana", 
+        "PROVIDENCIA": "Metropolitana", "PUDAHUEL": "Metropolitana", "QUILICURA": "Metropolitana", 
+        "QUINTA NORMAL": "Metropolitana", "RECOLETA": "Metropolitana", "RENCA": "Metropolitana", 
+        "SAN JOAQUIN": "Metropolitana", "SAN MIGUEL": "Metropolitana", "SAN RAMON": "Metropolitana", 
+        "VITACURA": "Metropolitana", "PUENTE ALTO": "Metropolitana", "PIRQUE": "Metropolitana", 
+        "SAN JOSE DE MAIPO": "Metropolitana", "COLINA": "Metropolitana", "LAMPA": "Metropolitana", 
+        "TIL TIL": "Metropolitana", "SAN BERNARDO": "Metropolitana", "BUIN": "Metropolitana", 
+        "CALERA DE TANGO": "Metropolitana", "PAINE": "Metropolitana", "MELIPILLA": "Metropolitana", 
+        "ALHUE": "Metropolitana", "CURACAVI": "Metropolitana", "MARIA PINTO": "Metropolitana", 
+        "SAN PEDRO": "Metropolitana", "TALAGANTE": "Metropolitana", "EL MONTE": "Metropolitana", 
+        "ISLA DE MAIPO": "Metropolitana", "PADRE HURTADO": "Metropolitana", "PEÑAFLOR": "Metropolitana", 
+        "SANTIAGO CENTRO": "Metropolitana",
+        # Localidades específicas SISS
+        "HACIENDA BATUCO": "Metropolitana", "REINA NORTE": "Metropolitana", 
+        "EL COLORADO": "Metropolitana", "LA PARVA": "Metropolitana", "VALLE NEVADO": "Metropolitana",
+        "SANTA MARIA DE MANQUEHUE": "Metropolitana", "LO CURRO": "Metropolitana",
+
         # VI O'Higgins
-        "RANCAGUA": "O'Higgins", "MACHALI": "O'Higgins", "SAN FERNANDO": "O'Higgins", "RENGO": "O'Higgins", "SAN VICENTE": "O'Higgins", "SANTA CRUZ": "O'Higgins", "CHIMBARONGO": "O'Higgins", "PICHILEMU": "O'Higgins",
+        "RANCAGUA": "O'Higgins", "CODEGUA": "O'Higgins", "COINCO": "O'Higgins", 
+        "COLTAUCO": "O'Higgins", "DOÑIHUE": "O'Higgins", "GRANEROS": "O'Higgins", 
+        "LAS CABRAS": "O'Higgins", "MACHALI": "O'Higgins", "MALLOA": "O'Higgins", 
+        "MOSTAZAL": "O'Higgins", "OLIVAR": "O'Higgins", "PEUMO": "O'Higgins", 
+        "PICHIDEGUA": "O'Higgins", "QUINTA DE TILCOCO": "O'Higgins", "RENGO": "O'Higgins", 
+        "REQUINOA": "O'Higgins", "SAN VICENTE": "O'Higgins", "PICHILEMU": "O'Higgins", 
+        "LA ESTRELLA": "O'Higgins", "LITUECHE": "O'Higgins", "MARCHIGUE": "O'Higgins", 
+        "NAVIDAD": "O'Higgins", "PAREDONES": "O'Higgins", "SAN FERNANDO": "O'Higgins", 
+        "CHEPICA": "O'Higgins", "CHIMBARONGO": "O'Higgins", "LOLOL": "O'Higgins", 
+        "NANCAGUA": "O'Higgins", "PALMILLA": "O'Higgins", "PERALILLO": "O'Higgins", 
+        "PLACILLA": "O'Higgins", "PUMANQUE": "O'Higgins", "SANTA CRUZ": "O'Higgins",
+
         # VII Maule
-        "TALCA": "Maule", "CURICO": "Maule", "LINARES": "Maule", "CONSTITUCION": "Maule", "CAUQUENES": "Maule", "MOLINA": "Maule", "PARRAL": "Maule", "SAN JAVIER": "Maule",
-        # VIII Biobío
-        "CONCEPCION": "Biobío", "TALCAHUANO": "Biobío", "CHIGUAYANTE": "Biobío", "SAN PEDRO DE LA PAZ": "Biobío", "LOS ANGELES": "Biobío", "CORONEL": "Biobío", "HUALPEN": "Biobío", "LOTA": "Biobío", "PENCO": "Biobío", "TOME": "Biobío", "ARAUCO": "Biobío",
+        "TALCA": "Maule", "CONSTITUCION": "Maule", "CUREPTO": "Maule", 
+        "EMPEDRADO": "Maule", "MAULE": "Maule", "PELARCO": "Maule", 
+        "PENCAHUE": "Maule", "RIO CLARO": "Maule", "SAN CLEMENTE": "Maule", 
+        "SAN RAFAEL": "Maule", "CAUQUENES": "Maule", "CHANCO": "Maule", 
+        "PELLUHUE": "Maule", "CURICO": "Maule", "HUALAÑE": "Maule", 
+        "LICANTEN": "Maule", "MOLINA": "Maule", "RAUCO": "Maule", 
+        "ROMERAL": "Maule", "SAGRADA FAMILIA": "Maule", "TENO": "Maule", 
+        "VICHUQUEN": "Maule", "LINARES": "Maule", "COLBUN": "Maule", 
+        "LONGAVI": "Maule", "PARRAL": "Maule", "RETIRO": "Maule", 
+        "SAN JAVIER": "Maule", "VILLA ALEGRE": "Maule", "YERBAS BUENAS": "Maule",
+
         # XVI Ñuble
-        "CHILLAN": "Ñuble", "CHILLAN VIEJO": "Ñuble", "SAN CARLOS": "Ñuble", "COELECURE": "Ñuble",
+        "COBQUECURA": "Ñuble", "COELECURE": "Ñuble", "NINHUE": "Ñuble", 
+        "PORTEZUELO": "Ñuble", "QUIRIHUE": "Ñuble", "RANQUIL": "Ñuble", 
+        "TREHUACO": "Ñuble", "CHILLAN": "Ñuble", "BULNES": "Ñuble", 
+        "CHILLAN VIEJO": "Ñuble", "EL CARMEN": "Ñuble", "PEMUCO": "Ñuble", 
+        "PINTO": "Ñuble", "QUILLON": "Ñuble", "SAN IGNACIO": "Ñuble", 
+        "YUNGAY": "Ñuble", "SAN CARLOS": "Ñuble", "COIHUECO": "Ñuble", 
+        "ÑIQUEN": "Ñuble", "SAN FABIAN": "Ñuble", "SAN NICOLAS": "Ñuble",
+
+        # VIII Biobío
+        "CONCEPCION": "Biobío", "CORONEL": "Biobío", "CHIGUAYANTE": "Biobío", 
+        "FLORIDA": "Biobío", "HUALQUI": "Biobío", "LOTA": "Biobío", 
+        "PENCO": "Biobío", "SAN PEDRO DE LA PAZ": "Biobío", "SANTA JUANA": "Biobío", 
+        "TALCAHUANO": "Biobío", "TOME": "Biobío", "HUALPEN": "Biobío", 
+        "LEBU": "Biobío", "ARAUCO": "Biobío", "CAÑETE": "Biobío", 
+        "CONTULMO": "Biobío", "CURANILAHUE": "Biobío", "LOS ALAMOS": "Biobío", 
+        "TIRUA": "Biobío", "LOS ANGELES": "Biobío", "ANTUCO": "Biobío", 
+        "CABRERO": "Biobío", "LAJA": "Biobío", "MULCHEN": "Biobío", 
+        "NACIMIENTO": "Biobío", "NEGRETE": "Biobío", "QUILLACO": "Biobío", 
+        "QUILLECO": "Biobío", "SAN ROSENDO": "Biobío", "SANTA BARBARA": "Biobío", 
+        "TUCAPEL": "Biobío", "YUMBEL": "Biobío", "ALTO BIOBIO": "Biobío",
+
         # IX Araucanía
-        "TEMUCO": "Araucanía", "PADRE LAS CASAS": "Araucanía", "VILLARRICA": "Araucanía", "ANGOL": "Araucanía", "PUCON": "Araucanía", "VICTORIA": "Araucanía", "LAUTARO": "Araucanía",
+        "TEMUCO": "Araucanía", "CARAHUE": "Araucanía", "CUNCO": "Araucanía", 
+        "CURARREHUE": "Araucanía", "FREIRE": "Araucanía", "GALVARINO": "Araucanía", 
+        "GORBEA": "Araucanía", "LAUTARO": "Araucanía", "LONCOCHE": "Araucanía", 
+        "MELIPEUCO": "Araucanía", "NUEVA IMPERIAL": "Araucanía", "PADRE LAS CASAS": "Araucanía", 
+        "PERQUENCO": "Araucanía", "PITRUFQUEN": "Araucanía", "PUCON": "Araucanía", 
+        "SAAVEDRA": "Araucanía", "TEODORO SCHMIDT": "Araucanía", "TOLTEN": "Araucanía", 
+        "VILCUN": "Araucanía", "VILLARRICA": "Araucanía", "CHOLCHOL": "Araucanía", 
+        "ANGOL": "Araucanía", "COLLIPULLI": "Araucanía", "CURACAUTIN": "Araucanía", 
+        "ERCILLA": "Araucanía", "LONQUIMAY": "Araucanía", "LOS SAUCES": "Araucanía", 
+        "LUMACO": "Araucanía", "PUREN": "Araucanía", "RENAICO": "Araucanía", 
+        "TRAIGUEN": "Araucanía", "VICTORIA": "Araucanía",
+
         # XIV Los Ríos
-        "VALDIVIA": "Los Ríos", "LA UNION": "Los Ríos", "RIO BUENO": "Los Ríos", "PANGUIPULLI": "Los Ríos",
+        "VALDIVIA": "Los Ríos", "CORRAL": "Los Ríos", "LANCO": "Los Ríos", 
+        "LOS LAGOS": "Los Ríos", "MAFIL": "Los Ríos", "MARIQUINA": "Los Ríos", 
+        "PAILLACO": "Los Ríos", "PANGUIPULLI": "Los Ríos", "LA UNION": "Los Ríos", 
+        "FUTRONO": "Los Ríos", "LAGO RANCO": "Los Ríos", "RIO BUENO": "Los Ríos",
+
         # X Los Lagos
-        "PUERTO MONTT": "Los Lagos", "OSORNO": "Los Lagos", "PUERTO VARAS": "Los Lagos", "CASTRO": "Los Lagos", "ANCUD": "Los Lagos", "FRUTILLAR": "Los Lagos",
+        "PUERTO MONTT": "Los Lagos", "CALBUCO": "Los Lagos", "COCHAMO": "Los Lagos", 
+        "FRESIA": "Los Lagos", "FRUTILLAR": "Los Lagos", "LOS MUERMOS": "Los Lagos", 
+        "LLANQUIHUE": "Los Lagos", "MAULLIN": "Los Lagos", "PUERTO VARAS": "Los Lagos", 
+        "CASTRO": "Los Lagos", "ANCUD": "Los Lagos", "CHONCHI": "Los Lagos", 
+        "CURACO DE VELEZ": "Los Lagos", "DALCAHUE": "Los Lagos", "PUQUELDON": "Los Lagos", 
+        "QUEILEN": "Los Lagos", "QUELLON": "Los Lagos", "QUEMCHI": "Los Lagos", 
+        "QUINCHAO": "Los Lagos", "OSORNO": "Los Lagos", "PUERTO OCTAY": "Los Lagos", 
+        "PURRANQUE": "Los Lagos", "PUYEHUE": "Los Lagos", "RIO NEGRO": "Los Lagos", 
+        "SAN JUAN DE LA COSTA": "Los Lagos", "SAN PABLO": "Los Lagos", 
+        "CHAITEN": "Los Lagos", "FUTALEUFU": "Los Lagos", "HUALAIHUE": "Los Lagos", 
+        "PALENA": "Los Lagos",
+
         # XI Aysén
-        "COYHAIQUE": "Aysén", "AYSEN": "Aysén", "PUERTO AYSEN": "Aysén", "CHILE CHICO": "Aysén",
+        "COYHAIQUE": "Aysén", "LAGO VERDE": "Aysén", "AYSEN": "Aysén", 
+        "PUERTO AYSEN": "Aysén", "CISNES": "Aysén", "GUAITECAS": "Aysén", 
+        "COCHRANE": "Aysén", "O'HIGGINS": "Aysén", "TORTEL": "Aysén", 
+        "CHILE CHICO": "Aysén", "RIO IBAÑEZ": "Aysén",
+
         # XII Magallanes
-        "PUNTA ARENAS": "Magallanes", "PUERTO NATALES": "Magallanes", "PORVENIR": "Magallanes"
+        "PUNTA ARENAS": "Magallanes", "LAGUNA BLANCA": "Magallanes", "RIO VERDE": "Magallanes", 
+        "SAN GREGORIO": "Magallanes", "CABO DE HORNOS": "Magallanes", "ANTARTICA": "Magallanes", 
+        "PORVENIR": "Magallanes", "PRIMAVERA": "Magallanes", "TIMAUKEL": "Magallanes", 
+        "NATALES": "Magallanes", "PUERTO NATALES": "Magallanes", "TORRES DEL PAINE": "Magallanes"
     }
 
 # ==========================================
@@ -603,6 +727,19 @@ elif modo_visualizacion == "Perfiles de agua (KM+PCA)":
                             st.write(f"- {c} <span style='color:gray;font-size:0.8em'>({reg})</span>", unsafe_allow_html=True)
                         if len(comunas_in_cluster) > 15:
                             st.caption(f"... y {len(comunas_in_cluster)-15} más")
+
+            # --- SECCION NUEVA: EXPORTAR DATOS DEL MODELO ---
+            st.markdown("---")
+            st.subheader("📥 Exportar Resultados del Modelo")
+            st.write("Descarga la clasificación de comunas y sus perfiles químicos promedio.")
+            
+            csv_clusters = df_results.to_csv(index=True).encode('utf-8')
+            st.download_button(
+                label="Descargar Reporte de Clusters (CSV)",
+                data=csv_clusters,
+                file_name="clusters_perfiles_agua.csv",
+                mime="text/csv"
+            )
 
 # ==========================================
 # FOOTER
