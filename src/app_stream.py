@@ -4,6 +4,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 from datetime import timedelta
+import calendar
+from pandas.tseries.offsets import MonthEnd
 
 # Librerías de Machine Learning
 try:
@@ -99,6 +101,7 @@ def get_comuna_region_map():
         "SAN PEDRO": "Metropolitana", "TALAGANTE": "Metropolitana", "EL MONTE": "Metropolitana", 
         "ISLA DE MAIPO": "Metropolitana", "PADRE HURTADO": "Metropolitana", "PEÑAFLOR": "Metropolitana", 
         "SANTIAGO CENTRO": "Metropolitana",
+        "SANTIAGO": "Metropolitana",
         # Localidades específicas SISS
         "HACIENDA BATUCO": "Metropolitana", "REINA NORTE": "Metropolitana", 
         "EL COLORADO": "Metropolitana", "LA PARVA": "Metropolitana", "VALLE NEVADO": "Metropolitana",
@@ -343,14 +346,45 @@ if modo_visualizacion == "Análisis Temporal":
     )
     
     # 4. Filtro Fechas
-    min_date = df_raw["DateTime"].min()
-    max_date = df_raw["DateTime"].max()
-    date_range = st.sidebar.date_input(
-        "Rango de Fechas",
-        value=(min_date, max_date),
-        min_value=min_date,
-        max_value=max_date
-    )
+    from pandas.tseries.offsets import MonthEnd 
+
+    st.sidebar.markdown("### Rango de Fechas")
+
+    # 1. Preparar datos de años y meses
+    min_y = int(df_raw["DateTime"].dt.year.min())
+    max_y = int(df_raw["DateTime"].dt.year.max())
+    years = list(range(min_y, max_y + 1))
+    months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+
+    if 's_m' not in st.session_state: st.session_state.s_m = months[0]
+    if 's_y' not in st.session_state: st.session_state.s_y = years[0]
+    if 'e_m' not in st.session_state: st.session_state.e_m = months[-1]
+    if 'e_y' not in st.session_state: st.session_state.e_y = years[-1]
+
+    # 2. Función para resetear (simplemente actualiza la memoria)
+    def reset_filters():
+        st.session_state.s_m = months[0]
+        st.session_state.s_y = years[0]
+        st.session_state.e_m = months[-1]
+        st.session_state.e_y = years[-1]
+
+    # 3. Botón de reinicio
+    st.sidebar.button("🔄 Reiniciar Filtros", on_click=reset_filters)
+
+    # 4. Selectores (SIN el parámetro 'index')
+    with st.sidebar.expander("📅 Seleccionar Rango", expanded=True):
+        c1, c2 = st.columns(2)
+        # Nota que borré "index=0". Ya no hace falta.
+        s_m = c1.selectbox("Mes Inicio", months, key="s_m") 
+        s_y = c2.selectbox("Año Inicio", years, key="s_y")
+
+        c3, c4 = st.columns(2)
+        # Nota que borré "index=11". Ya no hace falta.
+        e_m = c3.selectbox("Mes Fin", months, key="e_m")
+        e_y = c4.selectbox("Año Fin", years, key="e_y")
+    # 5. Lógica del Filtro
+    filter_start = pd.Timestamp(f"{s_y}-{months.index(s_m)+1}-01")
+    filter_end = pd.Timestamp(f"{e_y}-{months.index(e_m)+1}-01") + MonthEnd(0)
 
     st.title("Dashboard Calidad de agua potable Chile")
     
@@ -366,8 +400,8 @@ if modo_visualizacion == "Análisis Temporal":
         mask = (
             (df_raw["Parametro"] == selected_param) & 
             (df_raw["Comuna"].isin(selected_comunas)) &
-            (df_raw["DateTime"] >= pd.to_datetime(date_range[0])) &
-            (df_raw["DateTime"] <= pd.to_datetime(date_range[1]))
+            (df_raw["DateTime"] >= filter_start) &
+            (df_raw["DateTime"] <= filter_end)
         )
         df_filtered = df_raw[mask].copy()
         
@@ -746,7 +780,10 @@ elif modo_visualizacion == "Perfiles de agua (KM+PCA)":
 st.sidebar.markdown("---")
 with st.sidebar.expander("ℹ️ Acerca de"):
     st.markdown("""
-    **Monitor de Calidad de Agua**
-    v1.8
+    #### **Dashboard Calidad de Agua - v1.8**
+    > Este dashboard utiliza datos públicos de SISS Chile. No olviden compartir, dar feedback y referenciar.
+
+    **Autor**: Luis Plaza A. - Ing C. Quimico (@luchoplaza)
+    
     [GitHub: chile-waterquality](https://github.com/luchoplaza/chile-waterquality)
     """)
