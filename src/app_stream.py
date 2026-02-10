@@ -205,10 +205,9 @@ def load_data():
     script_dir = os.path.abspath(os.path.dirname(__file__))
     
     possible_paths = [
-        os.path.join(script_dir, "data", "rawdata_20240409.csv"),
-        os.path.join(script_dir, "..", "rawdata_20240409.csv"), 
-        "rawdata_20240409.csv",
-        "rawdata_20240409 (1).csv"
+        os.path.join(script_dir, "data", "rawdata.csv"),
+        os.path.join(script_dir, "..", "rawdata.csv"), 
+        "rawdata.csv",
     ]
     
     df = None
@@ -748,6 +747,6 @@ st.sidebar.markdown("---")
 with st.sidebar.expander("ℹ️ Acerca de"):
     st.markdown("""
     **Monitor de Calidad de Agua**
-    v1.8 - ML & UX Update
+    v1.8
     [GitHub: chile-waterquality](https://github.com/luchoplaza/chile-waterquality)
     """)
