@@ -14,12 +14,13 @@ try:
     from sklearn.cluster import KMeans
 except ImportError:
     st.error("⚠️ Falta instalar scikit-learn. Por favor agrega 'scikit-learn' a tu archivo requirements.txt")
-
+# Se recomienda ejecutar con OMP_NUM_THREADS=1 para evitar sobrecarga en sistemas con múltiples núcleos
+OMP_NUM_THREADS = "1"
 # ==========================================
 # CONFIGURACIÓN DE LA PÁGINA
 # ==========================================
 st.set_page_config(
-    page_title="Water Quality Chile - SISS Data",
+    page_title="Dashboard Calidad Agua Potable Chile",
     layout="wide",
     page_icon="💧",
     initial_sidebar_state="expanded"
@@ -48,6 +49,8 @@ def get_comuna_region_map():
         # I Tarapacá
         "IQUIQUE": "Tarapacá", "ALTO HOSPICIO": "Tarapacá", "POZO ALMONTE": "Tarapacá", 
         "CAMIÑA": "Tarapacá", "COLCHANE": "Tarapacá", "HUARA": "Tarapacá", "PICA": "Tarapacá",
+        "LA HUAYCA": "Tarapacá", "LA TIRANA": "Tarapacá", 
+        "MATILLA": "Tarapacá", "PISAGUA": "Tarapacá",
 
         # II Antofagasta
         "ANTOFAGASTA": "Antofagasta", "MEJILLONES": "Antofagasta", "SIERRA GORDA": "Antofagasta", 
@@ -58,6 +61,7 @@ def get_comuna_region_map():
         "COPIAPO": "Atacama", "CALDERA": "Atacama", "TIERRA AMARILLA": "Atacama", 
         "CHAÑARAL": "Atacama", "DIEGO DE ALMAGRO": "Atacama", "VALLENAR": "Atacama", 
         "ALTO DEL CARMEN": "Atacama", "FREIRINA": "Atacama", "HUASCO": "Atacama",
+        "INCA DE ORO": "Atacama", "EL SALADO": "Atacama", "CHANARAL": "Atacama",
 
         # IV Coquimbo
         "LA SERENA": "Coquimbo", "COQUIMBO": "Coquimbo", "ANDACOLLO": "Coquimbo", 
@@ -65,6 +69,12 @@ def get_comuna_region_map():
         "ILLAPEL": "Coquimbo", "CANELA": "Coquimbo", "LOS VILOS": "Coquimbo", 
         "SALAMANCA": "Coquimbo", "OVALLE": "Coquimbo", "COMBARBALA": "Coquimbo", 
         "MONTE PATRIA": "Coquimbo", "PUNITAQUI": "Coquimbo", "RIO HURTADO": "Coquimbo",
+        "PAIHUANO": "Coquimbo", "VICUÑA": "Coquimbo", "TONGOY": "Coquimbo",
+        "PERALILLO (IV)": "Coquimbo", "SOTAQUI": "Coquimbo", "CHANARAL ALTO": "Coquimbo",
+        "EL PALQUI": "Coquimbo", "ALGARROBITO": "Coquimbo", "HUAMALATA": "Coquimbo",
+        "AGUAS LA SERENA": "Coquimbo", "GUANAQUEROS": "Coquimbo", 
+        "CANELA ALTA": "Coquimbo", "CANELA BAJA": "Coquimbo",
+        "TOTORALILLO": "Coquimbo", "PICHIDANGUI": "Coquimbo",
 
         # V Valparaíso
         "VALPARAISO": "Valparaíso", "CASABLANCA": "Valparaíso", "CONCON": "Valparaíso", 
@@ -80,6 +90,20 @@ def get_comuna_region_map():
         "LLAILLAY": "Valparaíso", "PANQUEHUE": "Valparaíso", "PUTAENDO": "Valparaíso", 
         "SANTA MARIA": "Valparaíso", "QUILPUE": "Valparaíso", "LIMACHE": "Valparaíso", 
         "OLMUE": "Valparaíso", "VILLA ALEMANA": "Valparaíso",
+        "REAL CURIMON": "Valparaíso", "SANTA MARIA (V)": "Valparaíso", 
+        "MIRASOL DE ALGARROBO": "Valparaíso", "ALMENDRAL": "Valparaíso",
+        "SAN FELIPE - CHEPICAL": "Valparaíso", "PLACILLA - LA LIGUA": "Valparaíso",
+        "LLAYLLAY": "Valparaíso", "BRISAS DE MIRASOL": "Valparaíso",
+        "LOS MOLLES": "Valparaíso", "ALGARROBO NORTE": "Valparaíso",
+        "ARTIFICIO": "Valparaíso", "LA CALERA": "Valparaíso",
+        "PULLALLI": "Valparaíso", "LAS CRUCES": "Valparaíso",
+        "SAN SEBASTIAN": "Valparaíso", "CHINCOLCO": "Valparaíso",
+        "CURAUMA": "Valparaíso", "PUNTA DE TRALCA": "Valparaíso",
+        "PLACILLA - PENUELAS": "Valparaíso", "LA LAGUNA": "Valparaíso",
+        "CACHAGUA": "Valparaíso", "ISLA NEGRA": "Valparaíso",
+        "SAN ISIDRO": "Valparaíso", "RENACA": "Valparaíso",
+        "SAN PEDRO (V)": "Valparaíso", "VINA DEL MAR": "Valparaíso",
+        "ARAPIKI": "Valparaíso", "RANO KAU": "Valparaíso",
 
         # RM Metropolitana (Incluyendo localidades específicas del dataset)
         "SANTIAGO": "Metropolitana", "CERRILLOS": "Metropolitana", "CERRO NAVIA": "Metropolitana", 
@@ -102,10 +126,34 @@ def get_comuna_region_map():
         "ISLA DE MAIPO": "Metropolitana", "PADRE HURTADO": "Metropolitana", "PEÑAFLOR": "Metropolitana", 
         "SANTIAGO CENTRO": "Metropolitana",
         "SANTIAGO": "Metropolitana",
+        "POMAIRE": "Metropolitana", "VALDIVIA DE PAINE": "Metropolitana",
+        "EL MONTE - EL PAICO": "Metropolitana", "CHAMISERO": "Metropolitana",
+        "CHICUREO": "Metropolitana", "BARRANCAS": "Metropolitana",
+        "LARAPINTA": "Metropolitana", "EL ABRAZO": "Metropolitana",
+        "SAN JOSE": "Metropolitana", "MAIPU - CERRILLOS": "Metropolitana",
+        "QUILICURA - VALLE GRANDE I y II": "Metropolitana", "BARNECHEA": "Metropolitana",
+        "VALLE ESCONDIDO": "Metropolitana", "HARAS FIGURON": "Metropolitana",
+        "SERVICIOS SANITARIOS DE LA ESTACION": "Metropolitana", "BCC": "Metropolitana",
+        "AYRES DE CHICUREO": "Metropolitana", "VALLE GRANDE - COMUNA LAMPA": "Metropolitana",
+        "ESMERALDA": "Metropolitana", "TULLERIAS": "Metropolitana",
+        "SANTA ELENA": "Metropolitana", "HUERTOS FAMILIARES": "Metropolitana",
+        "SAN BORJA": "Metropolitana", "AGUAS CORDILLERA": "Metropolitana",
+        "LOS DOMINICOS": "Metropolitana", "LOMAS DE LO AGUIRRE": "Metropolitana",
+        "SANTA ROSA DEL PERAL": "Metropolitana", "SAN GABRIEL": "Metropolitana",
+        "TILTIL": "Metropolitana", "RINCONADA DE MAIPU": "Metropolitana",
+        "MALLOCO - PENAFLOR": "Metropolitana", "MELIPILLA NORTE": "Metropolitana",
+        "LAS VERTIENTES - EL CANELO": "Metropolitana", "BUIN - PAINE - LINDEROS": "Metropolitana",
+        "LOS TRAPENSES": "Metropolitana", "SANTA MARIA (RM)": "Metropolitana",
+        "BUIN - AGUAS SAN PEDRO": "Metropolitana", "PUERTAS DE PADRE HURTADO": "Metropolitana",
+        "SAN LUIS - COLINA": "Metropolitana", "ALTO LAMPA": "Metropolitana",
+        "UMBRAL": "Metropolitana", "BUIN PONIENTE": "Metropolitana",
+        "BAQUEDANO": "Metropolitana",
         # Localidades específicas SISS
         "HACIENDA BATUCO": "Metropolitana", "REINA NORTE": "Metropolitana", 
         "EL COLORADO": "Metropolitana", "LA PARVA": "Metropolitana", "VALLE NEVADO": "Metropolitana",
         "SANTA MARIA DE MANQUEHUE": "Metropolitana", "LO CURRO": "Metropolitana",
+        "S1-CANTILLANA": "Metropolitana", "ESTANQUE COTA 1040": "Metropolitana" , # San Carlos de Apoquindo
+        "LOS ALAMOS - RM": "Metropolitana",
 
         # VI O'Higgins
         "RANCAGUA": "O'Higgins", "CODEGUA": "O'Higgins", "COINCO": "O'Higgins", 
@@ -119,6 +167,13 @@ def get_comuna_region_map():
         "CHEPICA": "O'Higgins", "CHIMBARONGO": "O'Higgins", "LOLOL": "O'Higgins", 
         "NANCAGUA": "O'Higgins", "PALMILLA": "O'Higgins", "PERALILLO": "O'Higgins", 
         "PLACILLA": "O'Higgins", "PUMANQUE": "O'Higgins", "SANTA CRUZ": "O'Higgins",
+        "LO SECO": "O'Higgins", "ROSARIO": "O'Higgins", "DONIHUE": "O'Higgins",
+        "OLIVAR ALTO": "O'Higgins", "COYA": "O'Higgins", "LA PUNTA": "O'Higgins",
+        "SANTA CRUZ - PALMILLA": "O'Higgins", "PERALILLO (VI)": "O'Higgins",
+        "PELEQUEN": "O'Higgins", "BOCA RAPEL - NAVIDAD": "O'Higgins",
+        "POBLACION": "O'Higgins", "LO MIRANDA": "O'Higgins",
+        "SAN VICENTE DE TAGUA TAGUA": "O'Higgins", "SAN FRANCISCO DE MOSTAZAL": "O'Higgins",
+        "PUENTE NEGRO": "O'Higgins",
 
         # VII Maule
         "TALCA": "Maule", "CONSTITUCION": "Maule", "CUREPTO": "Maule", 
@@ -131,6 +186,11 @@ def get_comuna_region_map():
         "VICHUQUEN": "Maule", "LINARES": "Maule", "COLBUN": "Maule", 
         "LONGAVI": "Maule", "PARRAL": "Maule", "RETIRO": "Maule", 
         "SAN JAVIER": "Maule", "VILLA ALEGRE": "Maule", "YERBAS BUENAS": "Maule",
+        "CURANIPE": "Maule", "SARMIENTO": "Maule", 
+        "VILLA ALEGRE ESTACION": "Maule", "VILLA ALEGRE PUEBLO": "Maule",
+        "AGUAS DEL CENTRO": "Maule", "ILOCA": "Maule", "HUALANE": "Maule",
+        "LONTUE": "Maule", "PUTU": "Maule", "GUALLECO": "Maule",
+        "LOS QUENES": "Maule", "CURICO - ALTO DE ZAPALLAR": "Maule",
 
         # XVI Ñuble
         "COBQUECURA": "Ñuble", "COELECURE": "Ñuble", "NINHUE": "Ñuble", 
@@ -140,6 +200,8 @@ def get_comuna_region_map():
         "PINTO": "Ñuble", "QUILLON": "Ñuble", "SAN IGNACIO": "Ñuble", 
         "YUNGAY": "Ñuble", "SAN CARLOS": "Ñuble", "COIHUECO": "Ñuble", 
         "ÑIQUEN": "Ñuble", "SAN FABIAN": "Ñuble", "SAN NICOLAS": "Ñuble",
+        "NIPAS": "Ñuble", "COELEMU": "Ñuble", "SANTA CLARA": "Ñuble",
+        "LAS MARIPOSAS": "Ñuble",
 
         # VIII Biobío
         "CONCEPCION": "Biobío", "CORONEL": "Biobío", "CHIGUAYANTE": "Biobío", 
@@ -153,6 +215,12 @@ def get_comuna_region_map():
         "NACIMIENTO": "Biobío", "NEGRETE": "Biobío", "QUILLACO": "Biobío", 
         "QUILLECO": "Biobío", "SAN ROSENDO": "Biobío", "SANTA BARBARA": "Biobío", 
         "TUCAPEL": "Biobío", "YUMBEL": "Biobío", "ALTO BIOBIO": "Biobío",
+        "RAFAEL": "Biobío", "DICHATO": "Biobío", "QUILACO": "Biobío",
+        "MONTE AGUILA": "Biobío", "SAN PEDRO (VIII)": "Biobío",
+        "LIRQUEN": "Biobío", "LOMAS COLORADAS": "Biobío",
+        "RAMADILLAS": "Biobío", "CANETE": "Biobío", "CARAMPANGUE": "Biobío",
+        "HUEPIL": "Biobío", "PENCO-LIRQUEN": "Biobío",
+        "ESTANQUE LAS HIGUERAS": "Biobío", "PIONEROS": "Biobío",
 
         # IX Araucanía
         "TEMUCO": "Araucanía", "CARAHUE": "Araucanía", "CUNCO": "Araucanía", 
@@ -166,12 +234,21 @@ def get_comuna_region_map():
         "ERCILLA": "Araucanía", "LONQUIMAY": "Araucanía", "LOS SAUCES": "Araucanía", 
         "LUMACO": "Araucanía", "PUREN": "Araucanía", "RENAICO": "Araucanía", 
         "TRAIGUEN": "Araucanía", "VICTORIA": "Araucanía",
+        "CAJON": "Araucanía", "CHERQUENCO": "Araucanía", "LICANRAY": "Araucanía",
+        "QUEPE": "Araucanía", "LABRANZA": "Araucanía",
+        "TEMUCO - PADRE LAS CASAS": "Araucanía", "QUITRATUE": "Araucanía",
+        "NUEVA TOLTEN": "Araucanía", "PUERTO SAAVEDRA": "Araucanía",
+        "LASTARRIA": "Araucanía", "PILLANLELBUN": "Araucanía",
+        "CAPITAN PASTENE": "Araucanía", "MININCO": "Araucanía",
+        "TEMUCO - CENTRO": "Araucanía", "MONTAHUE": "Araucanía",
+        "IZARRA": "Araucanía",
 
         # XIV Los Ríos
         "VALDIVIA": "Los Ríos", "CORRAL": "Los Ríos", "LANCO": "Los Ríos", 
         "LOS LAGOS": "Los Ríos", "MAFIL": "Los Ríos", "MARIQUINA": "Los Ríos", 
         "PAILLACO": "Los Ríos", "PANGUIPULLI": "Los Ríos", "LA UNION": "Los Ríos", 
         "FUTRONO": "Los Ríos", "LAGO RANCO": "Los Ríos", "RIO BUENO": "Los Ríos",
+        "SAN JOSE DE LA MARIQUINA": "Los Ríos",
 
         # X Los Lagos
         "PUERTO MONTT": "Los Lagos", "CALBUCO": "Los Lagos", "COCHAMO": "Los Lagos", 
@@ -185,12 +262,25 @@ def get_comuna_region_map():
         "SAN JUAN DE LA COSTA": "Los Lagos", "SAN PABLO": "Los Lagos", 
         "CHAITEN": "Los Lagos", "FUTALEUFU": "Los Lagos", "HUALAIHUE": "Los Lagos", 
         "PALENA": "Los Lagos",
+        "ALERCE SUR": "Los Lagos", "LOMAS DE RELONCAVI": "Los Lagos",
+        "ANCUD - CAICUMEO": "Los Lagos", "ACHAO": "Los Lagos",
+        "ANCUD - CARACOLES": "Los Lagos", "PUERTO VARAS BIO-BIO": "Los Lagos",
+        "OSORNO 5000": "Los Lagos", "OSORNO G. HURTADO": "Los Lagos",
+        "CORTE ALTO": "Los Lagos", "PUERTO MONTT J": "Los Lagos",
+        "PUERTO MONTT G2-G3-G4": "Los Lagos", "PUERTO MONTT E-F-I": "Los Lagos",
+        "PUERTO MONTT C2 - C1": "Los Lagos", "ALERCE": "Los Lagos",
+        "PUERTO MONTT - K": "Los Lagos", "PUERTO MONTT G": "Los Lagos",
+        "PUERTO MONTT D1 - D2": "Los Lagos", "PUERTO VARAS DECHER": "Los Lagos",
+        "PUERTO MONTT H": "Los Lagos", "PANITAO": "Los Lagos",
+        "CHINQUIO": "Los Lagos", "SISTEMA A1 - ALTO BONITO": "Los Lagos",
 
         # XI Aysén
         "COYHAIQUE": "Aysén", "LAGO VERDE": "Aysén", "AYSEN": "Aysén", 
         "PUERTO AYSEN": "Aysén", "CISNES": "Aysén", "GUAITECAS": "Aysén", 
         "COCHRANE": "Aysén", "O'HIGGINS": "Aysén", "TORTEL": "Aysén", 
         "CHILE CHICO": "Aysén", "RIO IBAÑEZ": "Aysén",
+        "BALMACEDA": "Aysén", "PUERTO INGENIERO IBANEZ": "Aysén",
+        "PUERTO CHACABUCO": "Aysén", "PUERTO CISNES": "Aysén",
 
         # XII Magallanes
         "PUNTA ARENAS": "Magallanes", "LAGUNA BLANCA": "Magallanes", "RIO VERDE": "Magallanes", 
@@ -274,7 +364,7 @@ LIMS = {
     "COBRE": {"lim_max": 2.0, "ref": 2.0},
     "SOLIDOS DISUELTOS TOTALES": {"lim_max": 1500, "ref": 1500} 
 }
-
+# Quita los parámetros de tipo organoléptico (olor, sabor, color) para análisis cuantitativos
 param_disc = ["OLOR", "COLOR VERDADERO", "SABOR"]
 all_params = [p for p in df_raw["Parametro"].unique() if p not in param_disc]
 all_regions = sorted(df_raw["Region"].unique())
@@ -282,7 +372,7 @@ all_regions = sorted(df_raw["Region"].unique())
 # ==========================================
 # BARRA LATERAL (Navegación)
 # ==========================================
-st.sidebar.title("Water Quality Chile")
+st.sidebar.title("Parámetros fisico-químicos del agua potable en Chile")
 
 # Selector de Modo (Ahora al principio)
 modo_visualizacion = st.sidebar.radio(
@@ -290,7 +380,7 @@ modo_visualizacion = st.sidebar.radio(
     options=[
         "Análisis Temporal", 
         "Radar multipárametro", 
-        "Perfiles de agua (KM+PCA)"
+        "Perfiles de agua (KM+PCA) [Alpha]"
     ],
     index=0
 )
@@ -386,7 +476,7 @@ if modo_visualizacion == "Análisis Temporal":
     filter_start = pd.Timestamp(f"{s_y}-{months.index(s_m)+1}-01")
     filter_end = pd.Timestamp(f"{e_y}-{months.index(e_m)+1}-01") + MonthEnd(0)
 
-    st.title("Dashboard Calidad de agua potable Chile")
+    st.title("💧 Dashboard Calidad de agua potable Chile")
     
     if len(selected_comunas) == 1:
         reg = df_raw[df_raw["Comuna"] == selected_comunas[0]]["Region"].iloc[0]
@@ -426,7 +516,7 @@ if modo_visualizacion == "Análisis Temporal":
             st.plotly_chart(fig_line, use_container_width=True)
             
             # KPIs
-            st.subheader("📊 Estado Actual (Último Registro)")
+            st.subheader("📊 Estado Actual (Último reportado en SISS)")
             cols_kpi = st.columns(len(selected_comunas))
             
             for idx, comuna in enumerate(selected_comunas):
@@ -486,7 +576,9 @@ if modo_visualizacion == "Análisis Temporal":
 # VISTA 2: RADAR MULTIPARÁMETRO (RENOMBRADO)
 # ==========================================
 elif modo_visualizacion == "Radar multipárametro":
-    
+    st.markdown("""
+    Disposición comparativa entre comunas de los parámetros respecto a sus limites en un gráfico de radar, esto nos permite observar que elementos destacan en cada comuna relacionandolo con el limite que deberia tener este parámetro.
+    """)
     st.sidebar.subheader("⚙️ Configuración Radar")
     
     # 1. Filtro Región
@@ -616,8 +708,8 @@ elif modo_visualizacion == "Radar multipárametro":
 # ==========================================
 # VISTA 3: PERFILES DE AGUA (RENOMBRADO)
 # ==========================================
-elif modo_visualizacion == "Perfiles de agua (KM+PCA)":
-    st.title("🤖 Perfiles de agua (KM+PCA)")
+elif modo_visualizacion == "Perfiles de agua (KM+PCA) [Alpha]":
+    st.title("🤖 Perfiles de agua (KM+PCA) [Alpha]")
     st.markdown("""
     Agrupación automática de comunas según huella química (K-Means).
     **Nota:** El modelo usará las comunas de las regiones seleccionadas.
