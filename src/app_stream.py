@@ -7,6 +7,27 @@ from datetime import timedelta
 import calendar
 from pandas.tseries.offsets import MonthEnd
 
+def inject_gtm():
+    gtm_head_script = """
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-W38CTJJZ');</script>
+    <!-- End Google Tag Manager -->
+    """
+    gtm_body_noscript = """
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-W38CTJJZ"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+    """
+    components.html(gtm_head_script + gtm_body_noscript, height=0)
+
+# Inyectar Google Tag Manager para análisis de tráfico
+inject_gtm()
+
 # Librerías de Machine Learning
 try:
     from sklearn.preprocessing import StandardScaler
