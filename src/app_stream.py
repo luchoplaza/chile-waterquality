@@ -6,6 +6,7 @@ import streamlit as st
 from datetime import timedelta
 import calendar
 from pandas.tseries.offsets import MonthEnd
+import streamlit.components.v1 as components
 
 def inject_gtm():
     gtm_head_script = """
