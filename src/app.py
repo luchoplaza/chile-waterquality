@@ -535,6 +535,10 @@ if modo_visualizacion == "Análisis Temporal":
                 if "lim_min" in limits:
                     fig_line.add_hline(y=limits["lim_min"], line_dash="dash", line_color="orange", annotation_text="Límite Min")
 
+            fig_line.update_layout(
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
+            )
+
             st.plotly_chart(fig_line, use_container_width=True)
             
             # KPIs
@@ -571,6 +575,9 @@ if modo_visualizacion == "Análisis Temporal":
                 fig_hist = px.histogram(
                     df_filtered, x="Valor", color="Comuna", barmode="overlay",
                     title="Histograma", opacity=0.7
+                )
+                fig_hist.update_layout(
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
                 )
                 st.plotly_chart(fig_hist, use_container_width=True)
                 
@@ -707,7 +714,8 @@ elif modo_visualizacion == "Radar multipárametro":
 
             fig_radar.update_layout(
                 polar=dict(radialaxis=dict(visible=True, range=[0, upper_range])),
-                height=600, showlegend=True
+                height=600, showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
             )
             st.plotly_chart(fig_radar, use_container_width=True)
             
@@ -801,6 +809,9 @@ elif modo_visualizacion == "Perfiles de agua (KM+PCA) [Alpha]":
             )
             
             fig_pca.update_traces(marker=dict(size=12, line=dict(width=1, color='DarkSlateGrey')))
+            fig_pca.update_layout(
+                legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="left", x=0)
+            )
             st.plotly_chart(fig_pca, use_container_width=True)
             
             # Radar de Clusters (Modificado: Respecto a Límite Real)
@@ -856,7 +867,8 @@ elif modo_visualizacion == "Perfiles de agua (KM+PCA) [Alpha]":
                         radialaxis=dict(visible=True, tickformat=".1f") # Formato decimal
                     ),
                     title="Perfil de Riesgo Promedio por Cluster (Normalizado)",
-                    height=600
+                    height=600,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
                 )
                 
                 st.plotly_chart(fig_radar_clusters, use_container_width=True)
