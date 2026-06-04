@@ -15,10 +15,24 @@ GitHub Action alojado en el repositorio de datos (mensual), que copia el CSV pro
 `src/data/rawdata.csv` en la rama `main`.
 
 ## Uso local
+
+### Con [uv](https://docs.astral.sh/uv/) (recomendado)
+```bash
+uv venv
+uv pip install -r requirements.txt
+uv run streamlit run src/app.py
+```
+O en un solo paso, sin crear el entorno a mano:
+```bash
+uv run --with-requirements requirements.txt streamlit run src/app.py
+```
+
+### Con pip
 ```bash
 pip install -r requirements.txt
 streamlit run src/app.py
 ```
+
 La app queda disponible en http://localhost:8501/
 
 ## Despliegue
